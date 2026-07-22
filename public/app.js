@@ -800,6 +800,8 @@ async function loadSettings(){
     document.getElementById('recovery-days').value = s.recovery_days_after_expiry || 15;
     document.getElementById('recovery-batch').value = s.recovery_batch_size || 5;
     document.getElementById('recovery-interval').value = s.recovery_interval_minutes || 5;
+    document.getElementById('post-expiry-days').value = s.post_expiry_days || 3;
+    document.getElementById('post-expiry-template').value = s.post_expiry_message_template || '';
   }catch(err){ toast(err.message, true); }
 }
 
@@ -813,7 +815,9 @@ document.getElementById('btn-save-settings').addEventListener('click', async ()=
       renewal_message_template: document.getElementById('renewal-template').value,
       recovery_days_after_expiry: parseInt(document.getElementById('recovery-days').value, 10) || 15,
       recovery_batch_size: parseInt(document.getElementById('recovery-batch').value, 10) || 5,
-      recovery_interval_minutes: parseInt(document.getElementById('recovery-interval').value, 10) || 5
+      recovery_interval_minutes: parseInt(document.getElementById('recovery-interval').value, 10) || 5,
+      post_expiry_days: parseInt(document.getElementById('post-expiry-days').value, 10) || 3,
+      post_expiry_message_template: document.getElementById('post-expiry-template').value
     })});
     toast('Configurações salvas.');
   }catch(err){ toast(err.message, true); }

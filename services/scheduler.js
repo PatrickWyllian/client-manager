@@ -73,6 +73,22 @@ function buildRecoveryMessage(client) {
     .replace(/{usuario}/g, client.username || '—');
 }
 
+// --- Mensagem pós-vencimento (3 dias após expiração) ---
+function buildPostExpiryMessage(client) {
+  const template = getSetting(
+    'post_expiry_message_template',
+    'Olá {nome}! Tudo bem? Seu plano {servidor} expirou há {dias_vencidos} dia(s). Sentimos sua falta! 😊\n\nQue tal renovar e continuar aproveitando? Estou aqui para te ajudar!\n\n📅 Vencimento: {vencimento}\n👤 Usuário: {usuario}\n\nResponda esta mensagem para renovar!'
+  );
+  const [year, month, day] = client.due_date.split('-');
+  const formattedDate = `${day}/${month}/${year}`;
+  return template
+    .replace(/{nome}/g, client.name)
+    .replace(/{servidor}/g, client.server_name || client.plan || 'seu plano')
+    .replace(/{dias_vencidos}/g, String(daysSince(client.due_date)))
+    .replace(/{vencimento}/g, formattedDate)
+    .replace(/{usuario}/g, client.username || '—');
+}
+
 // --- Mensagem de confirmação de renovação ---
 function buildRenewalMessage(client, newDueDate) {
   const template = getSetting(
@@ -219,6 +235,63 @@ async function runRecoveryCheck(waService, io) {
   return { queued: queuedCount, total: toSend.length };
 }
 
+// --- Verificação pós-vencimento (3 dias após expiração) ---
+async function runPostExpiryCheck(waService, io) {
+  if (waService.getStatus().status !== 'connected') {
+    return { sent: 0, skipped: 'whatsapp_disconnected' };
+  }
+
+  const postExpiryDays = parseInt(getSetting('post_expiry_days', '3'), 10);
+
+  // Buscar clientes expirados há exatamente N dias
+  const today = new Date();
+  const targetDate = new Date(today);
+  targetDate.setDate(targetDate.getDate() - postExpiryDays);
+  const targetStr = targetDate.toISOString().slice(0, 10);
+
+  const expiredClients = db.prepare(`
+    SELECT c.*, s.name AS server_name
+    FROM clients c
+    LEFT JOIN servers s ON s.id = c.server_id
+    WHERE c.status = 'expirado' AND c.due_date = ?
+    ORDER BY c.due_date ASC
+  `).all(targetStr);
+
+  // Filtrar quem já recebeu mensagem pós-vencimento
+  const candidates = expiredClients.filter(client => {
+    const alreadySent = db.prepare(
+      "SELECT 1 FROM notifications_log WHERE client_id = ? AND type = 'post_expiry'"
+    ).get(client.id);
+    return !alreadySent;
+  });
+
+  if (candidates.length === 0) return { sent: 0 };
+
+  let queuedCount = 0;
+
+  for (const client of candidates) {
+    const message = buildPostExpiryMessage(client);
+
+    try {
+      if (messageQueue) {
+        messageQueue.enqueue(client.phone, message, 'post_expiry', client.id, 1);
+      } else {
+        await waService.sendMessage(client.phone, message);
+      }
+      db.prepare(
+        "INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, 'post_expiry')"
+      ).run(client.id, client.due_date);
+      queuedCount++;
+      console.log(`[scheduler] Pós-vencimento enfileirado para ${client.name} (${queuedCount}/${candidates.length})`);
+      if (io) io.emit('post_expiry:sent', { client: client.name, due_date: client.due_date });
+    } catch (err) {
+      console.error(`[scheduler] Falha ao enfileirar pós-vencimento para ${client.name}:`, err.message);
+    }
+  }
+
+  return { queued: queuedCount, total: candidates.length };
+}
+
 function startScheduler(waService, io, queue) {
   if (queue) {
     setMessageQueue(queue);
@@ -240,15 +313,24 @@ function startScheduler(waService, io, queue) {
     });
   });
 
-  console.log('[scheduler] Agendador iniciado — lembretes às 09:00, recuperação às 14:00.');
+  // Pós-vencimento (3 dias após): todos os dias às 10:00
+  cron.schedule('0 10 * * *', () => {
+    runPostExpiryCheck(waService, io).then(result => {
+      console.log('[scheduler] Verificação pós-vencimento:', result);
+    });
+  });
+
+  console.log('[scheduler] Agendador iniciado — lembretes às 09:00, pós-vencimento às 10:00, recuperação às 14:00.');
 }
 
 module.exports = {
   startScheduler,
   runReminderCheck,
   runRecoveryCheck,
+  runPostExpiryCheck,
   sendWelcomeMessage,
   buildWelcomeMessage,
   buildRecoveryMessage,
-  buildRenewalMessage
+  buildRenewalMessage,
+  buildPostExpiryMessage
 };

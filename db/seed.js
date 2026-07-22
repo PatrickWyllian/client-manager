@@ -14,6 +14,9 @@ function runSeed() {
   upsertSetting.run('recovery_days_after_expiry', '15');
   upsertSetting.run('recovery_batch_size', '5');
   upsertSetting.run('recovery_interval_minutes', '5');
+  upsertSetting.run('post_expiry_days', '3');
+  upsertSetting.run('post_expiry_message_template',
+    'Olá {nome}! Tudo bem? Seu plano {servidor} expirou há {dias_vencidos} dia(s). Sentimos sua falta! 😊\n\nQue tal renovar e continuar aproveitando? Estou aqui para te ajudar!\n\n📅 Vencimento: {vencimento}\n👤 Usuário: {usuario}\n\nResponda esta mensagem para renovar!');
 
   const planCount = db.prepare("SELECT COUNT(*) c FROM plans").get().c;
   if (planCount === 0) {

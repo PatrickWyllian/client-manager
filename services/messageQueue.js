@@ -7,7 +7,8 @@ class MessageQueue extends EventEmitter {
     this.waService = waService;
     this.io = io;
     this.processing = false;
-    this.intervalMs = 2 * 60 * 1000; // 2 minutos
+    this.defaultIntervalMs = 2 * 60 * 1000; // 2 minutos (envios individuais)
+    this.cronIntervalMs = 5 * 60 * 1000; // 5 minutos (cron/recuperação)
     this.timer = null;
   }
 
@@ -68,13 +69,16 @@ class MessageQueue extends EventEmitter {
       this.emit('queue:error', { ...pending, error: err.message });
     } finally {
       this.processing = false;
-      this.timer = setTimeout(() => this._processNext(), this.intervalMs);
+      // Cron usa 5 min, demais usam 2 min
+      const isCron = pending.type === 'reminder' || pending.type === 'recovery' || pending.type === 'post_expiry';
+      const delay = isCron ? this.cronIntervalMs : this.defaultIntervalMs;
+      this.timer = setTimeout(() => this._processNext(), delay);
     }
   }
 
   enqueue(phone, message, type = 'manual', clientId = null, priority = 0) {
     const result = db.prepare(
-      "INSERT INTO message_queue (client_id, phone, message, type, priority, scheduled_at) VALUES (?, ?, ?, ?, ?, datetime('now', '+2 minutes'))"
+      "INSERT INTO message_queue (client_id, phone, message, type, priority, scheduled_at) VALUES (?, ?, ?, ?, ?, datetime('now'))"
     ).run(clientId, phone, message, type, priority);
 
     this.emit('queue:added', { id: result.lastInsertRowid, phone, message, type });
@@ -131,7 +135,8 @@ class MessageQueue extends EventEmitter {
       pending: pending.count,
       current: processing || null,
       stats: stats.reduce((acc, s) => { acc[s.status] = s.count; return acc; }, {}),
-      intervalMs: this.intervalMs,
+      defaultIntervalMs: this.defaultIntervalMs,
+      cronIntervalMs: this.cronIntervalMs,
       processing: this.processing
     };
   }

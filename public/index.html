@@ -359,6 +359,19 @@
               <textarea id="recovery-template" rows="5"></textarea>
             </label>
             <p class="hint">Variáveis: {nome}, {servidor}, {dias_vencidos}, {vencimento}, {usuario}</p>
+          </div>
+
+          <!-- Pós-vencimento -->
+          <div class="wa-settings">
+            <h3>Mensagem pós-vencimento</h3>
+            <label>Dias após vencimento para enviar:
+              <input type="number" id="post-expiry-days" min="1" max="30" value="3">
+            </label>
+            <label>Modelo da mensagem:
+              <textarea id="post-expiry-template" rows="5"></textarea>
+            </label>
+            <p class="hint">Variáveis: {nome}, {servidor}, {dias_vencidos}, {vencimento}, {usuario}</p>
+          </div>
 
           <!-- Confirmação de Renovação -->
           <div class="wa-settings">
