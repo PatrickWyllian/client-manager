@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Manager · Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#10161A;--surface:#1A2227;--border:#2A353C;--text:#E9EEEC;--text-muted:#8FA098;--accent:#3DDC97;--danger:#E8624A;--font-display:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;--radius:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:360px;text-align:center;}
+.brand-mark{display:flex;align-items:flex-end;gap:3px;height:22px;justify-content:center;margin-bottom:16px;}
+.brand-mark .bar{width:4px;background:var(--accent);border-radius:2px;animation:pulse 1.8s ease-in-out infinite;}
+.brand-mark .b1{height:8px;} .brand-mark .b2{height:16px;animation-delay:.2s;} .brand-mark .b3{height:22px;animation-delay:.4s;} .brand-mark .b4{height:12px;animation-delay:.6s;}
+@keyframes pulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+h1{font-family:var(--font-display);font-size:22px;margin-bottom:4px;}
+p{color:var(--text-muted);font-size:13px;margin-bottom:24px;}
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-muted);text-align:left;margin-bottom:14px;}
+input{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:10px 12px;font-family:var(--font-body);font-size:14px;width:100%;}
+input:focus{outline:1px solid var(--accent);}
+.btn{background:var(--accent);color:#0B1310;border:none;border-radius:var(--radius);padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer;width:100%;margin-top:8px;transition:background .15s;}
+.btn:hover{background:#4FEFAB;}
+.error{color:var(--danger);font-size:12px;margin-top:10px;display:none;}
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="brand-mark">
+    <span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span><span class="bar b4"></span>
+  </div>
+  <h1>Client Manager</h1>
+  <p>Entre com suas credenciais</p>
+  <form id="login-form">
+    <label>Usuário
+      <input type="text" id="username" autocomplete="username" required>
+    </label>
+    <label>Senha
+      <input type="password" id="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit" class="btn">Entrar</button>
+    <p class="error" id="error-msg"></p>
+  </form>
+</div>
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errorEl = document.getElementById('error-msg');
+  errorEl.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      window.location.href = '/';
+    } else {
+      errorEl.textContent = data.error || 'Erro ao fazer login.';
+      errorEl.style.display = 'block';
+    }
+  } catch {
+    errorEl.textContent = 'Erro de conexão.';
+    errorEl.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>

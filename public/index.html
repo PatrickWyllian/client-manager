@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Manager · Painel de Controle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span><span class="bar b4"></span>
+      </div>
+      <div class="brand-text">
+        <strong>Client Manager</strong>
+        <span>painel de controle</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-tab="dashboard">
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-item" data-tab="clientes">
+        <span class="nav-label">Clientes</span>
+      </button>
+      <button class="nav-item" data-tab="servidores">
+        <span class="nav-label">Servidores</span>
+      </button>
+      <button class="nav-item" data-tab="financeiro">
+        <span class="nav-label">Financeiro</span>
+      </button>
+      <button class="nav-item" data-tab="planos">
+        <span class="nav-label">Planos</span>
+      </button>
+      <button class="nav-item" data-tab="whatsapp">
+        <span class="nav-label">WhatsApp</span>
+        <span class="nav-dot" id="wa-nav-dot"></span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="signal-status" id="sidebar-wa-status">
+        <span class="signal-dot"></span>
+        <span class="signal-text">verificando sinal…</span>
+      </div>
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <!-- DASHBOARD -->
+    <section class="tab-panel active" id="tab-dashboard">
+      <header class="panel-header">
+        <h1>Dashboard</h1>
+        <p>Visão geral dos clientes.</p>
+      </header>
+
+      <!-- KPIs Clientes -->
+      <div class="stat-grid">
+        <div class="stat-card accent">
+          <span class="stat-label">Clientes ativos</span>
+          <span class="stat-value" id="stat-active">—</span>
+        </div>
+        <div class="stat-card warn">
+          <span class="stat-label">Vencendo em 7 dias</span>
+          <span class="stat-value" id="stat-expiring">—</span>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-label">Vencidos</span>
+          <span class="stat-value" id="stat-overdue">—</span>
+        </div>
+      </div>
+
+      <!-- Vencimentos por período -->
+      <div class="card" style="margin-top:20px">
+        <h2>Vencimentos por período — Mês atual</h2>
+        <div id="projection-period-list" class="projection-period-list"></div>
+      </div>
+
+      <!-- Clientes vencidos -->
+      <div class="card expired-card" style="margin-top:20px">
+        <h2>Clientes vencidos</h2>
+        <div class="expired-summary">
+          <div class="expired-stat">
+            <span class="expired-count" id="stat-expired-count">—</span>
+            <span class="expired-label">total vencidos</span>
+          </div>
+          <div class="expired-stat">
+            <span class="expired-revenue" id="stat-expired-revenue">—</span>
+            <span class="expired-label">receita potencial/mês</span>
+          </div>
+        </div>
+        <div id="expired-list" class="expired-list"></div>
+      </div>
+
+      <!-- Vencimentos -->
+      <div class="card" style="margin-top:20px">
+        <h2>Próximos vencimentos</h2>
+        <div id="upcoming-list" class="upcoming-list"></div>
+      </div>
+    </section>
+    <!-- CLIENTES -->
+    <section class="tab-panel" id="tab-clientes">
+      <header class="panel-header">
+        <h1>Clientes</h1>
+        <p>Cadastre e gerencie os clientes vinculados a cada servidor.</p>
+        <button class="btn-primary" id="btn-new-client">+ Novo cliente</button>
+      </header>
+
+      <div class="filters">
+        <input type="text" id="filter-name" placeholder="Buscar por nome..." class="filter-search">
+        <select id="filter-server"><option value="">Todos os servidores</option></select>
+        <select id="filter-plan"><option value="">Todos os planos</option></select>
+        <select id="filter-status">
+          <option value="">Todos os status</option>
+          <option value="ativo">Ativo</option>
+          <option value="expirado">Expirado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>Telefone</th><th>Servidor</th><th>Custo Srv.</th><th>Plano</th>
+              <th>Valor</th><th>Desconto</th><th>Líquido</th><th>Vencimento</th><th>Usuário</th><th>Senha</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="clients-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SERVIDORES -->
+    <section class="tab-panel" id="tab-servidores">
+      <header class="panel-header">
+        <h1>Servidores</h1>
+        <p>Cadastre os servidores/painéis que atendem seus clientes.</p>
+        <button class="btn-primary" id="btn-new-server">+ Novo servidor</button>
+      </header>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Nome</th><th>Fornecedor</th><th>Custo mensal</th><th>Clientes ativos</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="servers-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PLANOS -->
+    <section class="tab-panel" id="tab-planos">
+      <header class="panel-header">
+        <h1>Planos</h1>
+        <p>Gerencie os planos disponíveis para seus clientes.</p>
+        <button class="btn-primary" id="btn-new-plan">+ Novo plano</button>
+      </header>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Nome</th><th>Preço</th><th>Duração</th><th>Telas</th><th>Clientes ativos</th><th></th></tr>
+          </thead>
+          <tbody id="plans-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- WHATSAPP -->
+    <!-- FINANCEIRO -->
+    <!-- FINANCEIRO -->
+    <!-- FINANCEIRO -->
+    <section class="tab-panel" id="tab-financeiro">
+      <header class="panel-header">
+        <h1>Financeiro</h1>
+        <p>Monitoramento de assinaturas e receita.</p>
+      </header>
+
+      <div class="financeiro-filters">
+        <label>Mês:
+          <input type="month" id="financeiro-month">
+        </label>
+      </div>
+
+      <!-- KPIs Principais -->
+      <div class="stat-grid">
+        <div class="stat-card accent">
+          <span class="stat-label">MRR (Receita mensal)</span>
+          <span class="stat-value" id="fin-mrr">—</span>
+        </div>
+        <div class="stat-card accent">
+          <span class="stat-label">Lucro Líquido</span>
+          <span class="stat-value" id="fin-net-profit">—</span>
+          <span class="stat-sub" id="fin-margin"></span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Assinaturas Ativas</span>
+          <span class="stat-value" id="fin-active">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Ticket Médio</span>
+          <span class="stat-value" id="fin-ticket">—</span>
+        </div>
+      </div>
+
+      <!-- Métricas de Assinatura -->
+      <div class="metric-row" style="margin-top:14px">
+        <div class="metric-pill">
+          <span class="metric-pill-label">Novos Cadastros</span>
+          <span class="metric-pill-value" id="fin-new">—</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-pill-label">Renovações</span>
+          <span class="metric-pill-value" id="fin-renewals">—</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-pill-label">Churn (30d)</span>
+          <span class="metric-pill-value" id="fin-churn">—</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-pill-label">Custo Servidores</span>
+          <span class="metric-pill-value" id="fin-server-cost">—</span>
+        </div>
+      </div>
+
+      <!-- Alertas -->
+      <div class="stat-grid" style="margin-top:14px">
+        <div class="stat-card warn">
+          <span class="stat-label">Vencendo (7 dias)</span>
+          <span class="stat-value" id="fin-expiring">—</span>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-label">Receita em Risco</span>
+          <span class="stat-value" id="fin-risk">—</span>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-label">Vencidos</span>
+          <span class="stat-value" id="fin-expired">—</span>
+        </div>
+      </div>
+
+      <!-- Projeção 6 meses -->
+      <div class="projection-card" id="fin-projection-section" style="margin-top:20px">
+        <h2>Projeção — Próximos 6 meses</h2>
+        <div class="projection-chart" id="fin-projection-chart"></div>
+        <div class="projection-legend">
+          <span class="legend-item"><span class="legend-dot safe"></span> Receita segura</span>
+          <span class="legend-item"><span class="legend-dot risk"></span> Em risco (vencimento)</span>
+          <span class="legend-item"><span class="legend-line"></span> Custo fixo</span>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="dash-grid" style="margin-top:20px">
+        <div class="card">
+          <h2>Servidores</h2>
+          <div id="fin-server-chart" class="chart"></div>
+        </div>
+        <div class="card">
+          <h2>Planos</h2>
+          <div id="fin-plan-chart" class="chart"></div>
+        </div>
+      </div>
+
+      <!-- Lista de vendas -->
+      <div class="card" style="margin-top:20px">
+        <h2>Vendas do mês</h2>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Data</th><th>Cliente</th><th>Telefone</th><th>Plano</th><th>Tipo</th><th>Valor</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="fin-sales-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <section class="tab-panel" id="tab-whatsapp">
+      <header class="panel-header">
+        <h1>WhatsApp</h1>
+        <p>Conecte seu WhatsApp para enviar mensagens automáticas.</p>
+      </header>
+
+      <div class="wa-panel">
+        <div class="wa-qr-box" id="wa-qr-box">
+          <div class="wa-placeholder" id="wa-placeholder">
+            <div class="brand-mark large">
+              <span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span><span class="bar b4"></span>
+            </div>
+            <p>Clique em "Conectar" para gerar o QR code.</p>
+          </div>
+          <img id="wa-qr-img" style="display:none" alt="QR Code WhatsApp">
+        </div>
+
+        <div class="wa-info">
+          <div class="wa-status-row">
+            <span class="signal-dot" id="wa-big-dot"></span>
+            <span id="wa-status-text">verificando…</span>
+          </div>
+          <p id="wa-phone" class="wa-phone"></p>
+
+          <div class="wa-actions">
+            <button class="btn-primary" id="btn-wa-connect">Conectar</button>
+            <button class="btn-secondary" id="btn-wa-disconnect" style="display:none">Desconectar</button>
+          </div>
+
+          <!-- Lembrete de vencimento -->
+          <div class="wa-settings">
+            <h3>Aviso de vencimento</h3>
+            <label>Avisar quantos dias antes do vencimento:
+              <input type="number" id="reminder-days" min="1" max="30" value="3">
+            </label>
+            <label>Modelo da mensagem:
+              <textarea id="reminder-template" rows="4"></textarea>
+            </label>
+            <p class="hint">Variáveis: {nome}, {servidor}, {dias}, {vencimento}</p>
+          </div>
+
+          <!-- Boas-vindas -->
+          <div class="wa-settings">
+            <h3>Mensagem de boas-vindas</h3>
+            <label>Enviada ao cadastrar novo cliente:
+              <textarea id="welcome-template" rows="5"></textarea>
+            </label>
+            <p class="hint">Variáveis: {nome}, {plano}, {servidor}, {vencimento}, {usuario}, {senha}, {valor}</p>
+          </div>
+
+          <!-- Recuperação -->
+          <div class="wa-settings">
+            <h3>Recuperação de clientes vencidos</h3>
+            <label>Dias após vencimento para iniciar recuperação:
+              <input type="number" id="recovery-days" min="1" max="90" value="15">
+            </label>
+            <label>Quantos clientes por dia:
+              <input type="number" id="recovery-batch" min="1" max="20" value="5">
+            </label>
+            <label>Intervalo entre envios (minutos):
+              <input type="number" id="recovery-interval" min="1" max="60" value="5">
+            </label>
+            <label>Modelo da mensagem:
+              <textarea id="recovery-template" rows="5"></textarea>
+            </label>
+            <p class="hint">Variáveis: {nome}, {servidor}, {dias_vencidos}, {vencimento}, {usuario}</p>
+
+          <!-- Confirmação de Renovação -->
+          <div class="wa-settings">
+            <h3>Confirmação de renovação</h3>
+            <label>Enviada ao renovar cliente:
+              <textarea id="renewal-template" rows="5"></textarea>
+            </label>
+            <p class="hint">Variáveis: {nome}, {plano}, {servidor}, {novo_vencimento}, {usuario}</p>
+          </div>
+          </div>
+
+          <button class="btn-secondary" id="btn-save-settings" style="margin-top:12px">Salvar todas as configurações</button>
+        </div>
+      </div>
+
+      <!-- FILA DE MENSAGENS -->
+      <div class="card" style="margin-top:20px">
+        <div class="queue-header">
+          <h2>Fila de Mensagens</h2>
+          <div class="queue-actions">
+            <button class="btn-secondary" id="btn-queue-refresh">Atualizar</button>
+            <button class="btn-secondary" id="btn-queue-cancel-all" style="background:var(--danger)">Cancelar Pendentes</button>
+            <button class="btn-secondary" id="btn-queue-clear">Limpar Histórico</button>
+          </div>
+        </div>
+
+        <div class="queue-stats" id="queue-stats">
+          <div class="queue-stat">
+            <span class="queue-stat-label">Na fila</span>
+            <span class="queue-stat-value" id="queue-pending-count">0</span>
+          </div>
+          <div class="queue-stat">
+            <span class="queue-stat-label">Enviadas</span>
+            <span class="queue-stat-value" id="queue-sent-count">0</span>
+          </div>
+          <div class="queue-stat">
+            <span class="queue-stat-label">Erros</span>
+            <span class="queue-stat-value" id="queue-error-count">0</span>
+          </div>
+          <div class="queue-stat">
+            <span class="queue-stat-label">Intervalo</span>
+            <span class="queue-stat-value">2 min</span>
+          </div>
+        </div>
+
+        <div class="queue-current" id="queue-current-section" style="display:none">
+          <h3>Enviando agora</h3>
+          <div class="queue-item sending" id="queue-current-item"></div>
+        </div>
+
+        <div class="queue-pending" id="queue-pending-section">
+          <h3>Na fila (<span id="queue-pending-label">0</span>)</h3>
+          <div class="queue-list" id="queue-pending-list"></div>
+        </div>
+
+        <div class="queue-history" style="margin-top:20px">
+          <h3>Histórico</h3>
+          <div class="queue-list" id="queue-history-list"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modal Cliente -->
+<div class="modal-overlay" id="client-modal">
+  <div class="modal">
+    <h2 id="client-modal-title">Novo cliente</h2>
+    <input type="hidden" id="client-id">
+    <label>Nome <input type="text" id="client-name"></label>
+    <label>Telefone (com DDI, ex: 5521999999999) <input type="text" id="client-phone"></label>
+    <label>Servidor
+      <select id="client-server"></select>
+    </label>
+    <span id="server-cost-display" style="font-size:0.85em;color:var(--accent);margin-top:-8px;margin-bottom:8px;display:block"></span>
+    <label>Plano
+      <select id="client-plan"></select>
+    </label>
+    <label>Valor mensal (R$) <input type="number" step="0.01" id="client-price"></label>
+    <label>Desconto mensal (R$) <input type="number" step="0.01" id="client-discount"></label>
+    <label>Data de vencimento <input type="date" id="client-due"></label>
+    <label>Usuário do servidor <input type="text" id="client-username" placeholder="Login do servidor"></label>
+    <label>Senha do servidor <input type="text" id="client-password" placeholder="Senha do servidor"></label>
+    <label>Status
+      <select id="client-status">
+        <option value="ativo">Ativo</option>
+        <option value="expirado">Expirado</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="client-cancel">Cancelar</button>
+      <button class="btn-primary" id="client-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Servidor -->
+<div class="modal-overlay" id="server-modal">
+  <div class="modal">
+    <h2 id="server-modal-title">Novo servidor</h2>
+    <input type="hidden" id="server-id">
+    <label>Nome <input type="text" id="server-name"></label>
+    <label>Fornecedor <input type="text" id="server-provider"></label>
+    <label>Custo mensal (R$) <input type="number" step="0.01" id="server-cost"></label>
+    <label>Status
+      <select id="server-status">
+        <option value="ativo">Ativo</option>
+        <option value="inativo">Inativo</option>
+      </select>
+    </label>
+    <label>Observações <textarea id="server-notes" rows="3"></textarea></label>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="server-cancel">Cancelar</button>
+      <button class="btn-primary" id="server-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Plano -->
+<div class="modal-overlay" id="plan-modal">
+  <div class="modal">
+    <h2 id="plan-modal-title">Novo plano</h2>
+    <input type="hidden" id="plan-id">
+    <label>Nome <input type="text" id="plan-name"></label>
+    <label>Preço (R$) <input type="number" step="0.01" id="plan-price"></label>
+    <label>Duração (meses) <input type="number" id="plan-duration" min="1" value="1"></label>
+    <label>Telas simultâneas <input type="number" id="plan-screens" min="1" value="1"></label>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="plan-cancel">Cancelar</button>
+      <button class="btn-primary" id="plan-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Renovação -->
+<div class="modal-overlay" id="renew-modal">
+  <div class="modal">
+    <h2>Renovar cliente</h2>
+    <p id="renew-client-name" style="color:var(--text-muted);font-size:13px;margin:0 0 16px;"></p>
+    <input type="hidden" id="renew-client-id">
+    <label>Data da renovação <input type="date" id="renew-date"></label>
+    <p class="hint" id="renew-hint" style="margin-top:-4px;margin-bottom:12px;"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="renew-cancel">Cancelar</button>
+      <button class="btn-primary" id="renew-confirm">Confirmar renovação</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

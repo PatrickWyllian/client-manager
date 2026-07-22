@@ -1,0 +1,26 @@
+{
+  "name": "client-manager",
+  "version": "1.0.0",
+  "description": "Sistema de gestão de clientes com integração a mensageria",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.3.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.6.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^3.0.3",
+    "pino": "^9.4.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5"
+  }
+}
