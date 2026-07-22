@@ -63,6 +63,11 @@ class WhatsAppService {
         this.qrDataUrl = null;
         this.phoneNumber = this.sock.user?.id?.split(':')[0] || null;
         this.emitStatus();
+        // Processar fila ao conectar
+        if (this.queue) {
+          console.log('[whatsapp] Conectado — processando fila de mensagens...');
+          this.queue._processNext();
+        }
       }
 
       if (connection === 'close') {

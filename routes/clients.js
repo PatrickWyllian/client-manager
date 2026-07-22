@@ -168,7 +168,9 @@ module.exports = (waService) => {
       }
 
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(client.id);
-      if (waService && waService.getStatus().status === 'connected') {
+
+      // Sempre enfileirar mensagem de renovação (mesmo se WhatsApp desconectado)
+      if (waService) {
         try {
           const clientFull = db.prepare(`
             SELECT c.*, s.name AS server_name
@@ -177,9 +179,9 @@ module.exports = (waService) => {
             WHERE c.id = ?
           `).get(client.id);
           const renewalMsg = buildRenewalMessage(clientFull, newDue);
-          await waService.sendMessage(client.phone, renewalMsg);
+          waService.queue.enqueue(client.phone, renewalMsg, 'renewal', client.id, 2);
         } catch (err) {
-          console.error('[clients] Erro ao enviar renovação:', err.message);
+          console.error('[clients] Erro ao enfileirar renovação:', err.message);
         }
       }
       res.json({ ...updated, days_until_due: daysUntil(updated.due_date) });

@@ -107,14 +107,16 @@ function buildRenewalMessage(client, newDueDate) {
 
 // --- Enviar boas-vindas ao cadastrar cliente ---
 async function sendWelcomeMessage(waService, client) {
-  if (waService.getStatus().status !== 'connected') return false;
   try {
     const message = buildWelcomeMessage(client);
 
     if (messageQueue) {
       messageQueue.enqueue(client.phone, message, 'welcome', client.id, 2);
-    } else {
+    } else if (waService.getStatus().status === 'connected') {
       await waService.sendMessage(client.phone, message);
+    } else {
+      console.log(`[scheduler] WhatsApp desconectado — boas-vindas para ${client.name} enfileirada`);
+      return false;
     }
 
     db.prepare(
@@ -129,10 +131,6 @@ async function sendWelcomeMessage(waService, client) {
 
 // --- Verificar lembretes de vencimento ---
 async function runReminderCheck(waService, io) {
-  if (waService.getStatus().status !== 'connected') {
-    return { sent: 0, skipped: 'whatsapp_disconnected' };
-  }
-
   const reminderDays = parseInt(getSetting('reminder_days_before', '3'), 10);
 
   const clients = db.prepare(`
@@ -158,7 +156,7 @@ async function runReminderCheck(waService, io) {
     try {
       if (messageQueue) {
         messageQueue.enqueue(client.phone, message, 'reminder', client.id, 1);
-      } else {
+      } else if (waService.getStatus().status === 'connected') {
         await waService.sendMessage(client.phone, message);
       }
       db.prepare(
@@ -176,10 +174,6 @@ async function runReminderCheck(waService, io) {
 
 // --- Verificação de recuperação (clientes vencidos >N dias) ---
 async function runRecoveryCheck(waService, io) {
-  if (waService.getStatus().status !== 'connected') {
-    return { sent: 0, skipped: 'whatsapp_disconnected' };
-  }
-
   const daysAfterExpiry = parseInt(getSetting('recovery_days_after_expiry', '15'), 10);
   const batchSize = parseInt(getSetting('recovery_batch_size', '5'), 10);
 
@@ -218,7 +212,7 @@ async function runRecoveryCheck(waService, io) {
     try {
       if (messageQueue) {
         messageQueue.enqueue(client.phone, message, 'recovery', client.id, 1);
-      } else {
+      } else if (waService.getStatus().status === 'connected') {
         await waService.sendMessage(client.phone, message);
       }
       db.prepare(
@@ -237,10 +231,6 @@ async function runRecoveryCheck(waService, io) {
 
 // --- Verificação pós-vencimento (3 dias após expiração) ---
 async function runPostExpiryCheck(waService, io) {
-  if (waService.getStatus().status !== 'connected') {
-    return { sent: 0, skipped: 'whatsapp_disconnected' };
-  }
-
   const postExpiryDays = parseInt(getSetting('post_expiry_days', '3'), 10);
 
   // Buscar clientes expirados há exatamente N dias
@@ -275,7 +265,7 @@ async function runPostExpiryCheck(waService, io) {
     try {
       if (messageQueue) {
         messageQueue.enqueue(client.phone, message, 'post_expiry', client.id, 1);
-      } else {
+      } else if (waService.getStatus().status === 'connected') {
         await waService.sendMessage(client.phone, message);
       }
       db.prepare(
