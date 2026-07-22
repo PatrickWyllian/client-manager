@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: client-manager
+    restart: unless-stopped
+    ports:
+      - "3400:3400"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3400
+      - HOST=0.0.0.0
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASS=${ADMIN_PASS}
+      - CORS_ORIGIN=${CORS_ORIGIN}

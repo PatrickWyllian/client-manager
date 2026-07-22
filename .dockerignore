@@ -1,0 +1,8 @@
+node_modules
+data/*.db
+data/*.db-*
+data/wa-auth
+data/database.sqlite
+.env
+.mimocode
+.git
