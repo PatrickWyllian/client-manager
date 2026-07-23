@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO settings (key, value) VALUES ('reminder_days_before', '3');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('reminder_message_template',
   'Ola {nome}! Seu plano {servidor} vence em {dias} dia(s), no dia {vencimento}. Renove para nao perder o acesso. Qualquer duvida, estou a disposicao!');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('reminder_schedule_hour', '11');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('reminder_schedule_minute', '30');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('reminder_schedule_enabled', '1');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('post_expiry_schedule_hour', '11');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('post_expiry_schedule_minute', '35');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('post_expiry_schedule_enabled', '1');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_hour', '11');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_minute', '40');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_enabled', '1');
 
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

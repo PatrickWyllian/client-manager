@@ -802,11 +802,31 @@ async function loadSettings(){
     document.getElementById('recovery-interval').value = s.recovery_interval_minutes || 5;
     document.getElementById('post-expiry-days').value = s.post_expiry_days || 3;
     document.getElementById('post-expiry-template').value = s.post_expiry_message_template || '';
+
+    // Schedule settings
+    const reminderHour = s.reminder_schedule_hour || '11';
+    const reminderMinute = s.reminder_schedule_minute || '30';
+    document.getElementById('reminder-schedule-time').value = `${reminderHour.padStart(2, '0')}:${reminderMinute.padStart(2, '0')}`;
+    document.getElementById('reminder-schedule-enabled').checked = s.reminder_schedule_enabled !== '0';
+
+    const postExpiryHour = s.post_expiry_schedule_hour || '11';
+    const postExpiryMinute = s.post_expiry_schedule_minute || '35';
+    document.getElementById('post-expiry-schedule-time').value = `${postExpiryHour.padStart(2, '0')}:${postExpiryMinute.padStart(2, '0')}`;
+    document.getElementById('post-expiry-schedule-enabled').checked = s.post_expiry_schedule_enabled !== '0';
+
+    const recoveryHour = s.recovery_schedule_hour || '11';
+    const recoveryMinute = s.recovery_schedule_minute || '40';
+    document.getElementById('recovery-schedule-time').value = `${recoveryHour.padStart(2, '0')}:${recoveryMinute.padStart(2, '0')}`;
+    document.getElementById('recovery-schedule-enabled').checked = s.recovery_schedule_enabled !== '0';
   }catch(err){ toast(err.message, true); }
 }
 
 document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
   try{
+    const reminderTime = document.getElementById('reminder-schedule-time').value.split(':');
+    const postExpiryTime = document.getElementById('post-expiry-schedule-time').value.split(':');
+    const recoveryTime = document.getElementById('recovery-schedule-time').value.split(':');
+
     await api('/settings', {method:'PUT', body: JSON.stringify({
       reminder_days_before: parseInt(document.getElementById('reminder-days').value, 10) || 3,
       reminder_message_template: document.getElementById('reminder-template').value,
@@ -817,9 +837,18 @@ document.getElementById('btn-save-settings').addEventListener('click', async ()=
       recovery_batch_size: parseInt(document.getElementById('recovery-batch').value, 10) || 5,
       recovery_interval_minutes: parseInt(document.getElementById('recovery-interval').value, 10) || 5,
       post_expiry_days: parseInt(document.getElementById('post-expiry-days').value, 10) || 3,
-      post_expiry_message_template: document.getElementById('post-expiry-template').value
+      post_expiry_message_template: document.getElementById('post-expiry-template').value,
+      reminder_schedule_hour: parseInt(reminderTime[0], 10),
+      reminder_schedule_minute: parseInt(reminderTime[1], 10),
+      reminder_schedule_enabled: document.getElementById('reminder-schedule-enabled').checked ? '1' : '0',
+      post_expiry_schedule_hour: parseInt(postExpiryTime[0], 10),
+      post_expiry_schedule_minute: parseInt(postExpiryTime[1], 10),
+      post_expiry_schedule_enabled: document.getElementById('post-expiry-schedule-enabled').checked ? '1' : '0',
+      recovery_schedule_hour: parseInt(recoveryTime[0], 10),
+      recovery_schedule_minute: parseInt(recoveryTime[1], 10),
+      recovery_schedule_enabled: document.getElementById('recovery-schedule-enabled').checked ? '1' : '0'
     })});
-    toast('Configurações salvas.');
+    toast('Configurações salvas. Horários atualizados!');
   }catch(err){ toast(err.message, true); }
 });
 

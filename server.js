@@ -9,7 +9,7 @@ const { Server } = require('socket.io');
 
 const WhatsAppService = require('./services/whatsapp');
 const MessageQueue = require('./services/messageQueue');
-const { startScheduler, runReminderCheck } = require('./services/scheduler');
+const { startScheduler, restartScheduler, runReminderCheck } = require('./services/scheduler');
 const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
@@ -81,7 +81,7 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/whatsapp', require('./routes/whatsapp')(waService, messageQueue));
 app.use('/api/sales', require('./routes/sales'));
-app.use('/api/settings', require('./routes/settings'));
+app.use('/api/settings', require('./routes/settings')(waService, io));
 
 // Redirect to login for non-API, non-static routes
 app.get('*', (req, res) => {

@@ -324,7 +324,16 @@
 
           <!-- Lembrete de vencimento -->
           <div class="wa-settings">
-            <h3>Aviso de vencimento</h3>
+            <div class="wa-settings-header">
+              <h3>Aviso de vencimento</h3>
+              <div class="schedule-controls">
+                <label class="toggle-label">
+                  <input type="checkbox" id="reminder-schedule-enabled" checked>
+                  <span>Ativo</span>
+                </label>
+                <input type="time" id="reminder-schedule-time" value="11:30">
+              </div>
+            </div>
             <label>Avisar quantos dias antes do vencimento:
               <input type="number" id="reminder-days" min="1" max="30" value="3">
             </label>
@@ -345,7 +354,16 @@
 
           <!-- Recuperação -->
           <div class="wa-settings">
-            <h3>Recuperação de clientes vencidos</h3>
+            <div class="wa-settings-header">
+              <h3>Recuperação de clientes vencidos</h3>
+              <div class="schedule-controls">
+                <label class="toggle-label">
+                  <input type="checkbox" id="recovery-schedule-enabled" checked>
+                  <span>Ativo</span>
+                </label>
+                <input type="time" id="recovery-schedule-time" value="11:40">
+              </div>
+            </div>
             <label>Dias após vencimento para iniciar recuperação:
               <input type="number" id="recovery-days" min="1" max="90" value="15">
             </label>
@@ -363,7 +381,16 @@
 
           <!-- Pós-vencimento -->
           <div class="wa-settings">
-            <h3>Mensagem pós-vencimento</h3>
+            <div class="wa-settings-header">
+              <h3>Mensagem pós-vencimento</h3>
+              <div class="schedule-controls">
+                <label class="toggle-label">
+                  <input type="checkbox" id="post-expiry-schedule-enabled" checked>
+                  <span>Ativo</span>
+                </label>
+                <input type="time" id="post-expiry-schedule-time" value="11:35">
+              </div>
+            </div>
             <label>Dias após vencimento para enviar:
               <input type="number" id="post-expiry-days" min="1" max="30" value="3">
             </label>

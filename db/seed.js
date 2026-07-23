@@ -15,6 +15,15 @@ function runSeed() {
   upsertSetting.run('recovery_batch_size', '5');
   upsertSetting.run('recovery_interval_minutes', '5');
   upsertSetting.run('post_expiry_days', '3');
+  upsertSetting.run('reminder_schedule_hour', '11');
+  upsertSetting.run('reminder_schedule_minute', '30');
+  upsertSetting.run('reminder_schedule_enabled', '1');
+  upsertSetting.run('post_expiry_schedule_hour', '11');
+  upsertSetting.run('post_expiry_schedule_minute', '35');
+  upsertSetting.run('post_expiry_schedule_enabled', '1');
+  upsertSetting.run('recovery_schedule_hour', '11');
+  upsertSetting.run('recovery_schedule_minute', '40');
+  upsertSetting.run('recovery_schedule_enabled', '1');
   upsertSetting.run('post_expiry_message_template',
     'Olá {nome}! Tudo bem? Seu plano {servidor} expirou há {dias_vencidos} dia(s). Sentimos sua falta! 😊\n\nQue tal renovar e continuar aproveitando? Estou aqui para te ajudar!\n\n📅 Vencimento: {vencimento}\n👤 Usuário: {usuario}\n\nResponda esta mensagem para renovar!');
 

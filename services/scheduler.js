@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const db = require('../db/database');
 const { daysUntil, daysSince } = require('../lib/dateHelpers');
 let messageQueue = null;
+let scheduledJobs = {};
 
 function setMessageQueue(queue) {
   messageQueue = queue;
@@ -10,6 +11,68 @@ function setMessageQueue(queue) {
 function getSetting(key, fallback) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
+}
+
+function getSchedulesFromDB() {
+  return {
+    reminder: {
+      hour: parseInt(getSetting('reminder_schedule_hour', '11'), 10),
+      minute: parseInt(getSetting('reminder_schedule_minute', '30'), 10),
+      enabled: getSetting('reminder_schedule_enabled', '1') === '1'
+    },
+    post_expiry: {
+      hour: parseInt(getSetting('post_expiry_schedule_hour', '11'), 10),
+      minute: parseInt(getSetting('post_expiry_schedule_minute', '35'), 10),
+      enabled: getSetting('post_expiry_schedule_enabled', '1') === '1'
+    },
+    recovery: {
+      hour: parseInt(getSetting('recovery_schedule_hour', '11'), 10),
+      minute: parseInt(getSetting('recovery_schedule_minute', '40'), 10),
+      enabled: getSetting('recovery_schedule_enabled', '1') === '1'
+    }
+  };
+}
+
+function startScheduledJobs(waService, io) {
+  Object.values(scheduledJobs).forEach(job => job.stop());
+  scheduledJobs = {};
+
+  const schedules = getSchedulesFromDB();
+
+  if (schedules.reminder.enabled) {
+    const cronExpr = `${schedules.reminder.minute} ${schedules.reminder.hour} * * *`;
+    scheduledJobs.reminder = cron.schedule(cronExpr, () => {
+      expireOverdueClients();
+      runReminderCheck(waService, io).then(result => {
+        console.log('[scheduler] Verificação de vencimentos:', result);
+      });
+    });
+    console.log(`[scheduler] Lembrete agendado para ${schedules.reminder.hour}:${String(schedules.reminder.minute).padStart(2, '0')}`);
+  }
+
+  if (schedules.recovery.enabled) {
+    const cronExpr = `${schedules.recovery.minute} ${schedules.recovery.hour} * * *`;
+    scheduledJobs.recovery = cron.schedule(cronExpr, () => {
+      runRecoveryCheck(waService, io).then(result => {
+        console.log('[scheduler] Verificação de recuperação:', result);
+      });
+    });
+    console.log(`[scheduler] Recuperação agendada para ${schedules.recovery.hour}:${String(schedules.recovery.minute).padStart(2, '0')}`);
+  }
+
+  if (schedules.post_expiry.enabled) {
+    const cronExpr = `${schedules.post_expiry.minute} ${schedules.post_expiry.hour} * * *`;
+    scheduledJobs.post_expiry = cron.schedule(cronExpr, () => {
+      runPostExpiryCheck(waService, io).then(result => {
+        console.log('[scheduler] Verificação pós-vencimento:', result);
+      });
+    });
+    console.log(`[scheduler] Pós-vencimento agendado para ${schedules.post_expiry.hour}:${String(schedules.post_expiry.minute).padStart(2, '0')}`);
+  }
+}
+
+function restartScheduler(waService, io) {
+  startScheduledJobs(waService, io);
 }
 
 function expireOverdueClients() {
@@ -287,34 +350,12 @@ function startScheduler(waService, io, queue) {
     setMessageQueue(queue);
   }
   expireOverdueClients();
-
-  // Lembrete de vencimento: todos os dias às 09:00
-  cron.schedule('0 9 * * *', () => {
-    expireOverdueClients();
-    runReminderCheck(waService, io).then(result => {
-      console.log('[scheduler] Verificação de vencimentos:', result);
-    });
-  });
-
-  // Recuperação de clientes vencidos: todos os dias às 14:00
-  cron.schedule('0 14 * * *', () => {
-    runRecoveryCheck(waService, io).then(result => {
-      console.log('[scheduler] Verificação de recuperação:', result);
-    });
-  });
-
-  // Pós-vencimento (3 dias após): todos os dias às 10:00
-  cron.schedule('0 10 * * *', () => {
-    runPostExpiryCheck(waService, io).then(result => {
-      console.log('[scheduler] Verificação pós-vencimento:', result);
-    });
-  });
-
-  console.log('[scheduler] Agendador iniciado — lembretes às 09:00, pós-vencimento às 10:00, recuperação às 14:00.');
+  startScheduledJobs(waService, io);
 }
 
 module.exports = {
   startScheduler,
+  restartScheduler,
   runReminderCheck,
   runRecoveryCheck,
   runPostExpiryCheck,
