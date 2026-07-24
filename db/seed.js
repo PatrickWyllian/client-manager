@@ -15,8 +15,8 @@ function runSeed() {
   upsertSetting.run('recovery_batch_size', '5');
   upsertSetting.run('recovery_interval_minutes', '5');
   upsertSetting.run('post_expiry_days', '3');
-  upsertSetting.run('reminder_schedule_hour', '11');
-  upsertSetting.run('reminder_schedule_minute', '30');
+  upsertSetting.run('reminder_schedule_hour', '10');
+  upsertSetting.run('reminder_schedule_minute', '0');
   upsertSetting.run('reminder_schedule_enabled', '1');
   upsertSetting.run('post_expiry_schedule_hour', '11');
   upsertSetting.run('post_expiry_schedule_minute', '35');
