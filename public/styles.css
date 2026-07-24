@@ -294,12 +294,11 @@ input:focus, textarea:focus, select:focus{outline:1px solid var(--accent);}
 
 .wa-settings-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
 .wa-settings-header h3{margin:0;}
-.schedule-controls{display:flex; align-items:center; gap:12px;}
-.schedule-controls input[type="time"]{
+input[type="time"]{
   padding:6px 10px; border:1px solid var(--border); border-radius:var(--radius);
   font-size:13px; font-family:var(--font-mono); background:var(--surface); color:var(--text);
 }
-.schedule-controls input[type="time"]:focus{outline:none; border-color:var(--accent);}
+input[type="time"]:focus{outline:none; border-color:var(--accent);}
 .toggle-label{display:flex !important; align-items:center; gap:6px; flex-direction:row !important;
   font-size:12px; color:var(--text-muted); cursor:pointer; margin:0 !important;}
 .toggle-label input[type="checkbox"]{width:14px; height:14px; accent-color:var(--accent);}
