@@ -7,6 +7,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const path = require('path');
+const fs = require('fs');
 const pino = require('pino');
 
 const AUTH_DIR = path.join(__dirname, '..', 'data', 'wa-auth');
@@ -74,12 +75,28 @@ class WhatsAppService {
 
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+        console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut}`);
+
         this.status = 'disconnected';
         this.qrDataUrl = null;
         this.phoneNumber = null;
         this.emitStatus();
-        if (shouldReconnect) {
+
+        if (isLoggedOut) {
+          // Sessão inválida: limpar credenciais antigas e reconectar para gerar novo QR code
+          console.log('[whatsapp] Sessão inválida (loggedOut) — limpando credenciais e reconectando...');
+          try {
+            const files = fs.readdirSync(AUTH_DIR);
+            for (const file of files) {
+              fs.unlinkSync(path.join(AUTH_DIR, file));
+            }
+          } catch (e) {
+            console.error('[whatsapp] Erro ao limpar wa-auth:', e.message);
+          }
+          // Pequena pausa antes de reconectar com sessão limpa
+          setTimeout(() => this.connect(), 1000);
+        } else {
           setTimeout(() => this.connect(), 3000);
         }
       }

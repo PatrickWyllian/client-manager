@@ -14,6 +14,9 @@ const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
 const server = http.createServer(app);
+
+// Confia no proxy reverso (Traefik) para o rate-limit funcionar corretamente
+app.set('trust proxy', 1);
 const io = new Server(server, {
   cors: {
     origin: process.env.CORS_ORIGIN || "*",
