@@ -14,7 +14,12 @@ const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: ["GET", "POST"]
+  }
+});
 
 const PORT = process.env.PORT || 3400;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || `http://localhost:${PORT}`;
