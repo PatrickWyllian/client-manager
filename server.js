@@ -89,7 +89,7 @@ app.use('/api/sales', require('./routes/sales'));
 app.use('/api/settings', require('./routes/settings')(waService, io));
 
 // Redirect to login for non-API, non-static routes
-app.get('*', (req, res) => {
+app.get('*', (req, res, next) => {
   if (!req.path.startsWith('/api/') && req.path !== '/' && req.path !== '/login') {
     return res.redirect('/');
   }

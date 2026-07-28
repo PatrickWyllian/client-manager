@@ -2,7 +2,8 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  Browsers
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -42,6 +43,7 @@ class WhatsAppService {
 
     this.sock = makeWASocket({
       version,
+      browser: Browsers.ubuntu('Chrome'),
       auth: state,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false
