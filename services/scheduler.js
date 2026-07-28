@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const db = require('../db/database');
-const { daysUntil, daysSince } = require('../lib/dateHelpers');
+const { daysUntil, daysSince, formatDate } = require('../lib/dateHelpers');
 let messageQueue = null;
 let scheduledJobs = {};
 
@@ -76,7 +76,7 @@ function restartScheduler(waService, io) {
 }
 
 function expireOverdueClients() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatDate(new Date());
   const result = db.prepare(
     "UPDATE clients SET status = 'expirado' WHERE status = 'ativo' AND due_date < ?"
   ).run(today);
@@ -244,7 +244,7 @@ async function runRecoveryCheck(waService, io) {
   const today = new Date();
   const cutoffDate = new Date(today);
   cutoffDate.setDate(cutoffDate.getDate() - daysAfterExpiry);
-  const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+  const cutoffStr = formatDate(cutoffDate);
 
   const expiredClients = db.prepare(`
     SELECT c.*, s.name AS server_name
@@ -300,7 +300,7 @@ async function runPostExpiryCheck(waService, io) {
   const today = new Date();
   const targetDate = new Date(today);
   targetDate.setDate(targetDate.getDate() - postExpiryDays);
-  const targetStr = targetDate.toISOString().slice(0, 10);
+  const targetStr = formatDate(targetDate);
 
   const expiredClients = db.prepare(`
     SELECT c.*, s.name AS server_name

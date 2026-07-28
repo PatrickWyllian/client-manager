@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS plans (
   price REAL DEFAULT 0,
   duration_months INTEGER NOT NULL DEFAULT 1,
   screens INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS servers (
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS servers (
   cost REAL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'ativo', -- ativo | inativo
   notes TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS clients (
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS clients (
   username TEXT,
   password TEXT,
   notes TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
 );
 
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS notifications_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   client_id INTEGER NOT NULL,
   due_date TEXT NOT NULL,
-  sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+  sent_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS sales (
   client_id INTEGER NOT NULL,
   type TEXT NOT NULL,
   value REAL DEFAULT 0,
-  sale_date TEXT NOT NULL DEFAULT (date('now')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  sale_date TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS message_queue (
   type TEXT NOT NULL DEFAULT 'manual',
   status TEXT NOT NULL DEFAULT 'pending',
   priority INTEGER DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   scheduled_at TEXT,
   sent_at TEXT,
   error TEXT,

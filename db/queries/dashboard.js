@@ -56,12 +56,12 @@ function getExpiredClients(limit = 10) {
     SELECT c.id, c.name, c.plan, c.price, c.discount, c.due_date, c.username,
       s.name AS server_name,
       (c.price - COALESCE(c.discount, 0)) / COALESCE(p.duration_months, 1) AS mrr,
-      CAST(julianday('now') - julianday(c.due_date) AS INTEGER) AS days_expired
+      CAST(julianday('now', 'localtime') - julianday(c.due_date) AS INTEGER) AS days_expired
     FROM clients c
     LEFT JOIN servers s ON s.id = c.server_id
     LEFT JOIN plans p ON p.name = c.plan
     WHERE c.status = 'expirado'
-    ORDER BY c.due_date ASC
+    ORDER BY c.due_date DESC
     LIMIT ?
   `).all(limit);
 }

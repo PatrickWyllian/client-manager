@@ -11,6 +11,7 @@ services:
     environment:
       - PORT=3400
       - HOST=0.0.0.0
+      - TZ=America/Sao_Paulo
       - JWT_SECRET=${JWT_SECRET}
       - ADMIN_USER=${ADMIN_USER}
       - ADMIN_PASS=${ADMIN_PASS}

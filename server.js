@@ -1,3 +1,6 @@
+// Fuso horário do Brasil — deve ser a PRIMEIRA linha antes de qualquer Date ser usado
+process.env.TZ = 'America/Sao_Paulo';
+
 require('dotenv').config();
 const express = require('express');
 const http = require('http');

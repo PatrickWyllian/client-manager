@@ -52,7 +52,7 @@ class MessageQueue extends EventEmitter {
       await this.waService.sock.sendMessage(jid, { text: pending.message });
 
       db.prepare(
-        "UPDATE message_queue SET status = 'sent', sent_at = datetime('now') WHERE id = ?"
+        "UPDATE message_queue SET status = 'sent', sent_at = datetime('now', 'localtime') WHERE id = ?"
       ).run(pending.id);
 
       this.emit('queue:sent', pending);
@@ -78,7 +78,7 @@ class MessageQueue extends EventEmitter {
 
   enqueue(phone, message, type = 'manual', clientId = null, priority = 0) {
     const result = db.prepare(
-      "INSERT INTO message_queue (client_id, phone, message, type, priority, scheduled_at) VALUES (?, ?, ?, ?, ?, datetime('now'))"
+      "INSERT INTO message_queue (client_id, phone, message, type, priority, scheduled_at) VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))"
     ).run(clientId, phone, message, type, priority);
 
     this.emit('queue:added', { id: result.lastInsertRowid, phone, message, type });

@@ -57,8 +57,8 @@ function runMigrations() {
       client_id INTEGER NOT NULL,
       type TEXT NOT NULL,
       value REAL DEFAULT 0,
-      sale_date TEXT NOT NULL DEFAULT (date('now')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      sale_date TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
     )
   `);
@@ -72,7 +72,7 @@ function runMigrations() {
       type TEXT NOT NULL DEFAULT 'manual',
       status TEXT NOT NULL DEFAULT 'pending',
       priority INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       scheduled_at TEXT,
       sent_at TEXT,
       error TEXT,
@@ -85,7 +85,7 @@ function runMigrations() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     )
   `);
 }

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { sendWelcomeMessage, buildRenewalMessage } = require('../services/scheduler');
-const { daysUntil } = require('../lib/dateHelpers');
+const { daysUntil, formatDate } = require('../lib/dateHelpers');
 const { NotFoundError, ValidationError } = require('../lib/errors');
 const { validateClient } = require('../lib/validators');
 
@@ -158,7 +158,7 @@ module.exports = (waService) => {
 
       const baseDate = new Date(renewal_date + 'T00:00:00');
       baseDate.setMonth(baseDate.getMonth() + months);
-      const newDue = baseDate.toISOString().slice(0, 10);
+      const newDue = formatDate(baseDate);
 
       db.prepare("UPDATE clients SET due_date = ?, status = 'ativo' WHERE id = ?").run(newDue, client.id);
       const renewValue = (client.price || 0) - (client.discount || 0);
