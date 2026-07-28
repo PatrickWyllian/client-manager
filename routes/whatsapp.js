@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const { buildRecoveryMessage } = require('../services/scheduler');
+const { buildRecoveryMessage, buildPostExpiryMessage } = require('../services/scheduler');
+const { daysSince } = require('../lib/dateHelpers');
 
 module.exports = (waService, messageQueue) => {
   router.get('/status', (req, res) => {
@@ -57,11 +58,18 @@ module.exports = (waService, messageQueue) => {
 
       if (!client) return res.status(404).json({ error: 'Cliente não encontrado.' });
 
-      const message = buildRecoveryMessage(client);
+      const expiredDays = daysSince(client.due_date);
 
-      messageQueue.enqueue(client.phone, message, 'recovery', client.id, 1);
+      // < 30 dias: template pós-vencimento | >= 30 dias: template de recuperação
+      const isRecovery = expiredDays >= 30;
+      const message = isRecovery
+        ? buildRecoveryMessage(client)
+        : buildPostExpiryMessage(client);
+      const msgType = isRecovery ? 'recovery' : 'post_expiry';
 
-      res.json({ ok: true, client: client.name });
+      messageQueue.enqueue(client.phone, message, msgType, client.id, 1);
+
+      res.json({ ok: true, client: client.name, days_expired: expiredDays, type: msgType });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
