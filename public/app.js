@@ -320,13 +320,23 @@ document.getElementById('client-save').addEventListener('click', async ()=>{
   }catch(err){ toast(err.message, true); }
 });
 
+let renewClientCache = null;
+
 // ---------- RENOVAÇÃO ----------
-window.renewClient = (id, name) => {
+window.renewClient = async (id, name) => {
   document.getElementById('renew-client-id').value = id;
   document.getElementById('renew-client-name').textContent = `Cliente: ${name}`;
   document.getElementById('renew-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('renew-hint').textContent = '';
+  renewClientCache = null;
+  try {
+    renewClientCache = await api(`/clients/${id}`);
+  } catch (err) {
+    console.error('[renew] Falha ao buscar cliente:', err.message);
+  }
   document.getElementById('renew-modal').classList.add('active');
+  // Dispara o preview com a data de hoje
+  document.getElementById('renew-date').dispatchEvent(new Event('change'));
 };
 
 document.getElementById('renew-cancel').addEventListener('click', () => {
@@ -337,16 +347,20 @@ document.getElementById('renew-date').addEventListener('change', function () {
   const id = document.getElementById('renew-client-id').value;
   const renewalDate = this.value;
   if (!renewalDate) return;
-  const plan = plansCache.find(p => {
-    const client = upcomingCache.find(c => c.id === parseInt(id));
-    return client && client.plan === p.name;
-  });
-  if (!plan) return;
-  const base = new Date(renewalDate + 'T00:00:00');
-  base.setMonth(base.getMonth() + plan.duration_months);
+  const client = renewClientCache || upcomingCache.find(c => c.id === parseInt(id));
+  if (!client) return;
+  const plan = plansCache.find(p => p.name === client.plan);
+  const months = plan ? plan.duration_months : 1;
+  const renewal = new Date(renewalDate + 'T00:00:00');
+  const currentDue = client.due_date ? new Date(client.due_date + 'T00:00:00') : null;
+  // Regra: preserva dias restantes — usa a maior entre due_date e renewal_date
+  const base = (currentDue && currentDue > renewal)
+    ? new Date(currentDue.getTime())
+    : new Date(renewal.getTime());
+  base.setMonth(base.getMonth() + months);
   const preview = base.toISOString().slice(0, 10).split('-');
   document.getElementById('renew-hint').textContent =
-    `Vencimento previsto: ${preview[2]}/${preview[1]}/${preview[0]} (${plan.duration_months} meses)`;
+    `Vencimento previsto: ${preview[2]}/${preview[1]}/${preview[0]} (${months} meses)`;
 });
 
 document.getElementById('renew-confirm').addEventListener('click', async () => {

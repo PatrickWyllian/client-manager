@@ -156,7 +156,12 @@ module.exports = (waService) => {
         if (plan) months = plan.duration_months;
       }
 
-      const baseDate = new Date(renewal_date + 'T00:00:00');
+      const renewal = new Date(renewal_date + 'T00:00:00');
+      const currentDue = client.due_date ? new Date(client.due_date + 'T00:00:00') : null;
+      // Preserva dias restantes: usa a maior entre due_date atual e renewal_date
+      const baseDate = currentDue && currentDue > renewal
+        ? new Date(currentDue.getTime())
+        : new Date(renewal.getTime());
       baseDate.setMonth(baseDate.getMonth() + months);
       const newDue = formatDate(baseDate);
 
