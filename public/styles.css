@@ -780,6 +780,24 @@ body::before {
 .legend-dot.safe { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .legend-dot.risk { background: var(--warn); box-shadow: 0 0 6px var(--warn-glow); }
 .legend-line { width: 16px; height: 0; border-top: 2px dashed var(--danger); }
+.legend-line.selected { border-top: 2px solid var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+
+/* ── GRAFICO HISTORICO LUCRO LIQUIDO ───────────────────────────── */
+.proj-bar-group.selected { transform: scale(1.08); }
+.proj-bar-group.selected .proj-bar-value { color: var(--accent); font-weight: 700; }
+.proj-bar-group.selected .proj-bar-label { color: var(--accent); font-weight: 600; }
+.proj-bar-group.selected .proj-bar-stack { box-shadow: 0 0 12px rgba(61, 220, 151, 0.4); }
+.proj-bar-stack.negative { border-radius: 0 0 6px 6px; }
+.proj-bar-stack.negative .proj-bar-risk { background: linear-gradient(0deg, var(--danger) 0%, rgba(232, 98, 74, 0.2) 100%); }
+.proj-zero-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px solid var(--glass-border);
+  opacity: 0.5;
+  pointer-events: none;
+}
 
 /* ── CARDS & CHARTS ────────────────────────────────────────────── */
 .dash-grid {

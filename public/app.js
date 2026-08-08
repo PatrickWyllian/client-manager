@@ -582,66 +582,75 @@ document.getElementById('plan-save').addEventListener('click', async ()=>{
 });
 
 // ---------- FINANCEIRO ----------
-// ---------- FINANCEIRO ----------
 async function loadFinanceiro(){
   try{
     const monthInput = document.getElementById('financeiro-month');
     const month = monthInput.value || new Date().toISOString().slice(0, 7);
     const [d, dash] = await Promise.all([
       api('/sales?month=' + month),
-      api('/dashboard')
+      api('/dashboard?month=' + month)
     ]);
 
-    // KPIs Principais — animated
-    animateMoneyValue(document.getElementById('fin-mrr'), dash.mrr);
+    const MONTH_LABELS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const fmtMonthLabel = (m) => {
+      const parts = MONTH_LABELS[parseInt(m.split('-')[1],10)-1];
+      return `${parts} ${m.split('-')[0]}`;
+    };
+    const isCur = dash.isCurrentMonth;
+
+    // KPIs Principais — dados REALIZADOS do mês selecionado
+    document.getElementById('fin-revenue-label').textContent = isCur ? 'Receita do Mês' : 'Receita do mês';
+    document.getElementById('fin-active-label').textContent = isCur ? 'Assinaturas Ativas' : 'Clientes Ativos no Mês';
+    animateMoneyValue(document.getElementById('fin-mrr'), dash.monthlyRevenue);
     animateMoneyValue(document.getElementById('fin-net-profit'), dash.netProfit);
     document.getElementById('fin-margin').textContent = dash.profitMargin + '% margem';
     animateValue(document.getElementById('fin-active'), 0, dash.totalActive);
     animateMoneyValue(document.getElementById('fin-ticket'), dash.avgTicket);
 
-    // Métricas de Assinatura
+    // Metricas de Assinatura
     document.getElementById('fin-new').textContent = dash.newClientsMonth;
-    document.getElementById('fin-renewals').textContent = dash.renewalsMonth;
-    document.getElementById('fin-churn').textContent = dash.churnRate + '%';
+    const renewalsPill = document.getElementById('fin-renewals');
+    renewalsPill.textContent = `${dash.renewalsCount} · ${money(dash.renewalsRevenue)}`;
+    renewalsPill.title = `${dash.renewalsCount} renovacoes neste mes — Lucro: ${money(dash.renewalsRevenue)}`;
+    document.getElementById('fin-renewals-revenue').textContent = money(dash.renewalsRevenue);
+    document.getElementById('fin-churn').textContent = isCur ? dash.churnRate + '%' : '—';
     document.getElementById('fin-server-cost').textContent = money(dash.monthlyServerCost);
 
-    // Alertas
-    animateValue(document.getElementById('fin-expiring'), 0, dash.expiringSoonCount);
-    animateMoneyValue(document.getElementById('fin-risk'), dash.revenueAtRisk);
-    animateValue(document.getElementById('fin-expired'), 0, dash.expiredCount);
+    // Alertas (só fazem sentido no mês vigente)
+    document.getElementById('fin-expiring').textContent = isCur ? dash.expiringSoonCount : '—';
+    document.getElementById('fin-risk').textContent = isCur ? money(dash.revenueAtRisk) : '—';
+    document.getElementById('fin-expired').textContent = isCur ? dash.expiredCount : '—';
 
-    // Projeção 6 meses
+    // Grafico de lucro liquido por mes (historico — comparacao entre meses)
     const container = document.getElementById('fin-projection-chart');
-    const projection = dash.projection6Months;
-    if(projection && projection.length){
-      const maxVal = Math.max(1, ...projection.map(p => p.safeRevenue + p.atRiskRevenue));
+    const history = dash.profitHistory;
+    const histTitle = document.getElementById('fin-projection-title');
+    if (histTitle) histTitle.textContent = 'Lucro Líquido por Mês';
+    if (history && history.length){
+      const maxAbs = Math.max(1, ...history.map(h => Math.abs(h.netProfit)));
       const maxH = 170;
-      const costVal = projection[0].serverCost;
-      const costY = maxH - ((costVal / maxVal) * maxH);
-      let html = `<div class="proj-cost-line" style="bottom:${costY + 30}px"></div>`;
-      html += `<div class="proj-cost-label" style="bottom:${costY + 30}px">Custo: ${money(costVal)}</div>`;
-      for(const p of projection){
-        const safeH = (p.safeRevenue / maxVal) * maxH;
-        const riskH = (p.atRiskRevenue / maxVal) * maxH;
-        const totalH = safeH + riskH;
+      let html = '';
+      for(const h of history){
+        const isSel = h.month === dash.selectedMonth;
+        const isNeg = h.netProfit < 0;
+        const barH = Math.max((Math.abs(h.netProfit) / maxAbs) * maxH, 4);
         html += `
-          <div class="proj-bar-group">
-            <div class="proj-bar-value">${money(p.safeRevenue + p.atRiskRevenue)}</div>
-            <div class="proj-bar-stack" style="height:${Math.max(totalH, 4)}px">
-              <div class="proj-bar-safe" style="height:${safeH}px"></div>
-              <div class="proj-bar-risk" style="height:${riskH}px"></div>
+          <div class="proj-bar-group${isSel ? ' selected' : ''}">
+            <div class="proj-bar-value">${money(h.netProfit)}</div>
+            <div class="proj-bar-stack ${isNeg ? 'negative' : ''}" style="height:${barH}px">
+              <div class="proj-bar-${isNeg ? 'risk' : 'safe'}" style="height:100%"></div>
             </div>
-            <div class="proj-bar-label">${p.label}</div>
-            ${p.expiringCount > 0 ? `<div class="proj-bar-sub">${p.expiringCount} venc.</div>` : ''}
+            <div class="proj-bar-label">${fmtMonthLabel(h.month)}</div>
+            <div class="proj-bar-sub">${h.countRenewals} renov. · ${money(h.totalSales)}</div>
           </div>`;
       }
       container.innerHTML = html;
       staggerItems(container, '.proj-bar-group', 80);
     } else {
-      container.innerHTML = '<p class="empty-msg">Sem dados de projeção.</p>';
+      container.innerHTML = '<p class="empty-msg">Sem historico de lucro.</p>';
     }
 
-    // Gráfico de servidores
+    // Grafico de servidores
     const chartEl = document.getElementById('fin-server-chart');
     const maxCount = Math.max(1, ...dash.serverRanking.map(s=>s.client_count));
     chartEl.innerHTML = dash.serverRanking.length ? dash.serverRanking.map(s=>`
@@ -653,7 +662,7 @@ async function loadFinanceiro(){
     `).join('') : '<p class="empty-msg">Nenhum servidor cadastrado.</p>';
     staggerItems(chartEl, '.chart-row', 60);
 
-    // Gráfico de planos
+    // Grafico de planos
     const planEl = document.getElementById('fin-plan-chart');
     const maxPlan = Math.max(1, ...dash.planDistribution.map(p=>p.count));
     planEl.innerHTML = dash.planDistribution.length ? dash.planDistribution.map(p=>`

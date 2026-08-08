@@ -223,7 +223,7 @@
       <!-- KPIs Principais -->
       <div class="stat-grid">
         <div class="stat-card accent">
-          <span class="stat-label">MRR (Receita mensal)</span>
+          <span class="stat-label" id="fin-revenue-label">Receita do Mês</span>
           <span class="stat-value" id="fin-mrr">—</span>
         </div>
         <div class="stat-card accent">
@@ -232,7 +232,7 @@
           <span class="stat-sub" id="fin-margin"></span>
         </div>
         <div class="stat-card">
-          <span class="stat-label">Assinaturas Ativas</span>
+          <span class="stat-label" id="fin-active-label">Assinaturas Ativas</span>
           <span class="stat-value" id="fin-active">—</span>
         </div>
         <div class="stat-card">
@@ -248,8 +248,12 @@
           <span class="metric-pill-value" id="fin-new">—</span>
         </div>
         <div class="metric-pill">
-          <span class="metric-pill-label">Renovações</span>
+          <span class="metric-pill-label">Renovados no mês</span>
           <span class="metric-pill-value" id="fin-renewals">—</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-pill-label">Lucro com Renovações</span>
+          <span class="metric-pill-value" id="fin-renewals-revenue">—</span>
         </div>
         <div class="metric-pill">
           <span class="metric-pill-label">Churn (30d)</span>
@@ -277,14 +281,14 @@
         </div>
       </div>
 
-      <!-- Projeção 6 meses -->
+      <!-- Lucro Líquido por Mês (histórico) -->
       <div class="projection-card" id="fin-projection-section" style="margin-top:20px">
-        <h2>Projeção — Próximos 6 meses</h2>
+        <h2 id="fin-projection-title">Lucro Líquido por Mês</h2>
         <div class="projection-chart" id="fin-projection-chart"></div>
         <div class="projection-legend">
-          <span class="legend-item"><span class="legend-dot safe"></span> Receita segura</span>
-          <span class="legend-item"><span class="legend-dot risk"></span> Em risco (vencimento)</span>
-          <span class="legend-item"><span class="legend-line"></span> Custo fixo</span>
+          <span class="legend-item"><span class="legend-dot safe"></span> Lucro positivo</span>
+          <span class="legend-item"><span class="legend-dot risk"></span> Prejuízo (negativo)</span>
+          <span class="legend-item"><span class="legend-line selected"></span> Mês selecionado</span>
         </div>
       </div>
 
