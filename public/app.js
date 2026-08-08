@@ -44,11 +44,57 @@ if (mobileMenuToggle) {
 
 const socket = io();
 
+// ---------- MICRO-ANIMATIONS HELPERS ----------
+function animateValue(el, start, end, duration = 600) {
+  if (start === end) { el.textContent = end; return; }
+  const startTime = performance.now();
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const current = Math.round(start + (end - start) * easeOut(progress));
+    el.textContent = current;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+function animateMoneyValue(el, end, duration = 600) {
+  const startTime = performance.now();
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const current = end * easeOut(progress);
+    el.textContent = money(current);
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+function staggerItems(container, selector, delay = 60) {
+  const items = container.querySelectorAll(selector);
+  items.forEach((item, i) => {
+    item.style.opacity = '0';
+    item.style.transform = 'translateY(8px)';
+    item.style.transition = `opacity 0.35s cubic-bezier(0.16,1,0.3,1) ${i * delay}ms, transform 0.35s cubic-bezier(0.16,1,0.3,1) ${i * delay}ms`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        item.style.opacity = '1';
+        item.style.transform = 'translateY(0)';
+      });
+    });
+  });
+}
+
+// ---------- TOAST ----------
 function toast(msg, isError=false){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(()=> t.className = 'toast', 2500);
+  setTimeout(()=> t.className = 'toast', 3000);
 }
 
 async function api(path, options={}){
@@ -84,7 +130,13 @@ document.querySelectorAll('.nav-item').forEach(btn=>{
     document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    const panel = document.getElementById('tab-' + btn.dataset.tab);
+    panel.classList.add('active');
+    // Re-trigger panel animation
+    panel.style.animation = 'none';
+    panel.offsetHeight; // force reflow
+    panel.style.animation = '';
+    
     if(btn.dataset.tab === 'dashboard') loadDashboard();
     if(btn.dataset.tab === 'clientes') loadClients();
     if(btn.dataset.tab === 'servidores') loadServers();
@@ -98,9 +150,14 @@ async function loadDashboard(){
   try{
     const d = await api('/dashboard');
 
-    document.getElementById('stat-active').textContent = d.totalActive;
-    document.getElementById('stat-expiring').textContent = d.expiringSoonCount;
-    document.getElementById('stat-overdue').textContent = d.expiredCount;
+    // Animate KPI values
+    const activeEl = document.getElementById('stat-active');
+    const expiringEl = document.getElementById('stat-expiring');
+    const overdueEl = document.getElementById('stat-overdue');
+    
+    animateValue(activeEl, 0, d.totalActive);
+    animateValue(expiringEl, 0, d.expiringSoonCount);
+    animateValue(overdueEl, 0, d.expiredCount);
 
     // Vencimentos por período
     const periodEl = document.getElementById('projection-period-list');
@@ -112,6 +169,7 @@ async function loadDashboard(){
         </div>
         <span class="period-value">${money(p.totalValue)}</span>
       </div>`).join('');
+    staggerItems(periodEl, '.period-item');
 
     // Clientes vencidos
     document.getElementById('stat-expired-count').textContent = d.expiredCount;
@@ -131,6 +189,7 @@ async function loadDashboard(){
           </div>
         </div>`;
     }).join('') : '<p class="empty-msg">Nenhum cliente vencido.</p>';
+    if (d.expiredClients.length) staggerItems(expiredEl, '.expired-item');
 
     // Lista de vencimentos
     upcomingCache = d.upcoming;
@@ -153,6 +212,7 @@ async function loadDashboard(){
           </div>
         </div>`;
     }).join('') : '<p class="empty-msg">Nenhum vencimento próximo.</p>';
+    if (d.upcoming.length) staggerItems(listEl, '.upcoming-item');
   }catch(err){ toast(err.message, true); }
 }
 
@@ -232,6 +292,8 @@ async function loadClients(){
         </td>
       </tr>`;
     }).join('') : '<tr><td colspan="13" class="empty-msg">Nenhum cliente cadastrado.</td></tr>';
+    // Stagger table rows
+    staggerItems(tbody, 'tr', 30);
   }catch(err){ toast(err.message, true); }
 }
 
@@ -397,6 +459,7 @@ async function loadServers(){
         </td>
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty-msg">Nenhum servidor cadastrado.</td></tr>';
+    staggerItems(tbody, 'tr', 40);
   }catch(err){ toast(err.message, true); }
 }
 
@@ -467,6 +530,7 @@ async function loadPlans(){
         </td>
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty-msg">Nenhum plano cadastrado.</td></tr>';
+    staggerItems(tbody, 'tr', 40);
   }catch(err){ toast(err.message, true); }
 }
 
@@ -528,12 +592,12 @@ async function loadFinanceiro(){
       api('/dashboard')
     ]);
 
-    // KPIs Principais
-    document.getElementById('fin-mrr').textContent = money(dash.mrr);
-    document.getElementById('fin-net-profit').textContent = money(dash.netProfit);
+    // KPIs Principais — animated
+    animateMoneyValue(document.getElementById('fin-mrr'), dash.mrr);
+    animateMoneyValue(document.getElementById('fin-net-profit'), dash.netProfit);
     document.getElementById('fin-margin').textContent = dash.profitMargin + '% margem';
-    document.getElementById('fin-active').textContent = dash.totalActive;
-    document.getElementById('fin-ticket').textContent = money(dash.avgTicket);
+    animateValue(document.getElementById('fin-active'), 0, dash.totalActive);
+    animateMoneyValue(document.getElementById('fin-ticket'), dash.avgTicket);
 
     // Métricas de Assinatura
     document.getElementById('fin-new').textContent = dash.newClientsMonth;
@@ -542,9 +606,9 @@ async function loadFinanceiro(){
     document.getElementById('fin-server-cost').textContent = money(dash.monthlyServerCost);
 
     // Alertas
-    document.getElementById('fin-expiring').textContent = dash.expiringSoonCount;
-    document.getElementById('fin-risk').textContent = money(dash.revenueAtRisk);
-    document.getElementById('fin-expired').textContent = dash.expiredCount;
+    animateValue(document.getElementById('fin-expiring'), 0, dash.expiringSoonCount);
+    animateMoneyValue(document.getElementById('fin-risk'), dash.revenueAtRisk);
+    animateValue(document.getElementById('fin-expired'), 0, dash.expiredCount);
 
     // Projeção 6 meses
     const container = document.getElementById('fin-projection-chart');
@@ -572,6 +636,7 @@ async function loadFinanceiro(){
           </div>`;
       }
       container.innerHTML = html;
+      staggerItems(container, '.proj-bar-group', 80);
     } else {
       container.innerHTML = '<p class="empty-msg">Sem dados de projeção.</p>';
     }
@@ -586,6 +651,7 @@ async function loadFinanceiro(){
         <span class="chart-count">${s.client_count} · ${money(s.mrr)}/mês</span>
       </div>
     `).join('') : '<p class="empty-msg">Nenhum servidor cadastrado.</p>';
+    staggerItems(chartEl, '.chart-row', 60);
 
     // Gráfico de planos
     const planEl = document.getElementById('fin-plan-chart');
@@ -597,6 +663,7 @@ async function loadFinanceiro(){
         <span class="chart-count">${p.count} · ${money(p.mrr)}/mês</span>
       </div>
     `).join('') : '<p class="empty-msg">Nenhum plano associado.</p>';
+    staggerItems(planEl, '.chart-row', 60);
 
     // Lista de vendas
     const tbody = document.getElementById('fin-sales-tbody');
@@ -604,7 +671,7 @@ async function loadFinanceiro(){
       const [y,m,day] = s.sale_date.split('-');
       const typeLabel = s.type === 'novo'
         ? '<span class="badge ativo">Novo</span>'
-        : '<span class="badge" style="background:#1a2a3a;color:#5b9bd5">Renovação</span>';
+        : '<span class="badge" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.2)">Renovação</span>';
       return `
         <tr>
           <td>${day}/${m}/${y}</td>
@@ -616,6 +683,7 @@ async function loadFinanceiro(){
           <td><button class="btn-undo" onclick="undoSale(${s.id}, '${s.client_name || ''}')">Desfazer</button></td>
         </tr>`;
     }).join('') : '<tr><td colspan="7" class="empty-msg">Nenhuma venda neste mês.</td></tr>';
+    staggerItems(tbody, 'tr', 30);
   }catch(err){ toast(err.message, true); }
 }
 
@@ -723,6 +791,7 @@ async function loadQueue() {
           </div>
         </div>
       `).join('');
+      staggerItems(pendingList, '.queue-item', 40);
     }
 
     const historyList = document.getElementById('queue-history-list');

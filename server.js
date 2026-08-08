@@ -13,6 +13,7 @@ const { Server } = require('socket.io');
 const WhatsAppService = require('./services/whatsapp');
 const MessageQueue = require('./services/messageQueue');
 const { startScheduler, restartScheduler, runReminderCheck } = require('./services/scheduler');
+const { startAutoBackup } = require('./services/backup');
 const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
@@ -93,6 +94,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/whatsapp', require('./routes/whatsapp')(waService, messageQueue));
 app.use('/api/sales', require('./routes/sales'));
 app.use('/api/settings', require('./routes/settings')(waService, io));
+app.use('/api/export', require('./routes/export'));
 
 // Redirect to login for non-API, non-static routes
 app.get('*', (req, res, next) => {
@@ -131,5 +133,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   console.log(`\n  Client Manager rodando em http://${process.env.HOST || '0.0.0.0'}:${PORT}\n`);
   startScheduler(waService, io, messageQueue);
+  startAutoBackup();
   messageQueue.start();
 });

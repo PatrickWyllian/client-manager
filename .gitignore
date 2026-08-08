@@ -5,3 +5,6 @@ data/wa-auth/
 .env
 data/database.sqlite
 .mimocode/
+cookies.txt
+server.log
+*.bak

@@ -1,6 +1,25 @@
 const db = require('../db/database');
 const { EventEmitter } = require('events');
 
+/**
+ * Spintax parser: replaces {option1|option2|option3} with a random choice
+ */
+function parseSpintax(text) {
+  if (!text || typeof text !== 'string') return text;
+  return text.replace(/\{([^{}]+)\}/g, (match, choices) => {
+    const options = choices.split('|');
+    return options[Math.floor(Math.random() * options.length)];
+  });
+}
+
+/**
+ * Business hours check (08:00 to 20:00)
+ */
+function isBusinessHours() {
+  const hour = new Date().getHours();
+  return hour >= 8 && hour < 20;
+}
+
 class MessageQueue extends EventEmitter {
   constructor(waService, io) {
     super();
@@ -28,6 +47,13 @@ class MessageQueue extends EventEmitter {
   async _processNext() {
     if (this.processing) return;
 
+    // Se estiver fora do horário comercial para envios automáticos, aguardar
+    if (!isBusinessHours()) {
+      console.log('[messageQueue] Fora do horário comercial (08h–20h). Fila pausada até as 08:00.');
+      this.timer = setTimeout(() => this._processNext(), 15 * 60 * 1000); // Tentar novamente em 15min
+      return;
+    }
+
     const pending = db.prepare(
       "SELECT * FROM message_queue WHERE status = 'pending' ORDER BY priority DESC, created_at ASC LIMIT 1"
     ).get();
@@ -41,6 +67,8 @@ class MessageQueue extends EventEmitter {
     this.processing = true;
     this.emit('queue:processing', pending);
 
+    let nextDelayMs = this.defaultIntervalMs;
+
     try {
       if (this.waService.getStatus().status !== 'connected') {
         this.processing = false;
@@ -48,8 +76,10 @@ class MessageQueue extends EventEmitter {
         return;
       }
 
+      // Aplica Spintax nas mensagens para variação anti-spam
+      const finalMessage = parseSpintax(pending.message);
       const jid = `${pending.phone.replace(/\D/g, '')}@s.whatsapp.net`;
-      await this.waService.sock.sendMessage(jid, { text: pending.message });
+      await this.waService.sock.sendMessage(jid, { text: finalMessage });
 
       db.prepare(
         "UPDATE message_queue SET status = 'sent', sent_at = datetime('now', 'localtime') WHERE id = ?"
@@ -69,10 +99,14 @@ class MessageQueue extends EventEmitter {
       this.emit('queue:error', { ...pending, error: err.message });
     } finally {
       this.processing = false;
-      // Cron usa 5 min, demais usam 2 min
       const isCron = pending.type === 'reminder' || pending.type === 'recovery' || pending.type === 'post_expiry';
-      const delay = isCron ? this.cronIntervalMs : this.defaultIntervalMs;
-      this.timer = setTimeout(() => this._processNext(), delay);
+      const baseDelay = isCron ? this.cronIntervalMs : this.defaultIntervalMs;
+      
+      // Jitter humano: variação aleatória entre 15s e 45s
+      const jitterMs = Math.floor(Math.random() * (45000 - 15000 + 1)) + 15000;
+      nextDelayMs = baseDelay + jitterMs;
+
+      this.timer = setTimeout(() => this._processNext(), nextDelayMs);
     }
   }
 

@@ -4,44 +4,290 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Client Manager · Login</title>
+<meta name="description" content="Acesse o painel de controle Client Manager.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#10161A;--surface:#1A2227;--border:#2A353C;--text:#E9EEEC;--text-muted:#8FA098;--accent:#3DDC97;--danger:#E8624A;--font-display:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;--radius:10px;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--font-body);display:flex;align-items:center;justify-content:center;min-height:100vh;}
-.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:360px;text-align:center;}
-.brand-mark{display:flex;align-items:flex-end;gap:3px;height:22px;justify-content:center;margin-bottom:16px;}
-.brand-mark .bar{width:4px;background:var(--accent);border-radius:2px;animation:pulse 1.8s ease-in-out infinite;}
-.brand-mark .b1{height:8px;} .brand-mark .b2{height:16px;animation-delay:.2s;} .brand-mark .b3{height:22px;animation-delay:.4s;} .brand-mark .b4{height:12px;animation-delay:.6s;}
-@keyframes pulse{0%,100%{opacity:.5;}50%{opacity:1;}}
-h1{font-family:var(--font-display);font-size:22px;margin-bottom:4px;}
-p{color:var(--text-muted);font-size:13px;margin-bottom:24px;}
-label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-muted);text-align:left;margin-bottom:14px;}
-input{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:10px 12px;font-family:var(--font-body);font-size:14px;width:100%;}
-input:focus{outline:1px solid var(--accent);}
-.btn{background:var(--accent);color:#0B1310;border:none;border-radius:var(--radius);padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer;width:100%;margin-top:8px;transition:background .15s;}
-.btn:hover{background:#4FEFAB;}
-.error{color:var(--danger);font-size:12px;margin-top:10px;display:none;}
+:root {
+  --bg: #060a13;
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
+  --text: #e8ecf4;
+  --text-muted: rgba(232, 236, 244, 0.4);
+  --text-secondary: rgba(232, 236, 244, 0.65);
+  --accent: #00e5ff;
+  --accent-glow: rgba(0, 229, 255, 0.3);
+  --purple: #a855f7;
+  --purple-glow: rgba(168, 85, 247, 0.3);
+  --danger: #ff4d6a;
+  --danger-glow: rgba(255, 77, 106, 0.25);
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --radius: 12px;
+  --radius-xl: 20px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  background-image: linear-gradient(135deg, #060a13 0%, #0d1525 40%, #0a1628 70%, #080e1f 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-body);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient glow background */
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(0, 229, 255, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 70%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  animation: ambientShift 15s ease-in-out infinite alternate;
+}
+
+@keyframes ambientShift {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(-3%, -2%) rotate(5deg); }
+}
+
+/* Floating orbs */
+body::after {
+  content: '';
+  position: fixed;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.08) 0%, transparent 70%);
+  top: 10%;
+  right: 15%;
+  animation: float1 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-20px, 30px); }
+}
+
+.login-container {
+  position: relative;
+  z-index: 1;
+  animation: loginIn 0.6s var(--ease-out);
+}
+
+@keyframes loginIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.login-box {
+  background: var(--glass);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 48px 40px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  box-shadow:
+    0 0 60px rgba(0, 0, 0, 0.4),
+    0 0 120px rgba(0, 229, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top border glow */
+.login-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow), var(--purple-glow), transparent);
+}
+
+.brand-mark {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 28px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.brand-mark .bar {
+  width: 5px;
+  border-radius: 3px;
+  animation: barPulse 2s ease-in-out infinite;
+}
+
+.brand-mark .b1 { height: 10px; background: var(--accent); animation-delay: 0s; }
+.brand-mark .b2 { height: 18px; background: var(--accent); animation-delay: 0.15s; }
+.brand-mark .b3 { height: 28px; background: var(--purple); animation-delay: 0.3s; }
+.brand-mark .b4 { height: 14px; background: var(--purple); animation-delay: 0.45s; }
+
+@keyframes barPulse {
+  0%, 100% { opacity: 0.4; transform: scaleY(0.85); }
+  50% { opacity: 1; transform: scaleY(1); filter: drop-shadow(0 0 8px currentColor); }
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 32px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: left;
+  margin-bottom: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.25s var(--ease-out);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow), inset 0 0 20px rgba(0, 229, 255, 0.03);
+  background: rgba(0, 229, 255, 0.03);
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+.btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #00b4d8 100%);
+  color: #060a13;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 8px;
+  transition: all 0.25s var(--ease-out);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+  transform: translateX(-100%);
+  transition: transform 0.4s var(--ease-out);
+}
+
+.btn:hover {
+  box-shadow: 0 0 24px var(--accent-glow), 0 4px 20px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn:hover::before {
+  transform: translateX(100%);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 14px;
+  display: none;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(255, 77, 106, 0.08);
+  border: 1px solid rgba(255, 77, 106, 0.15);
+  animation: errorIn 0.3s var(--ease-spring);
+}
+
+@keyframes errorIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .login-box {
+    padding: 36px 28px;
+  }
+  h1 { font-size: 20px; }
+}
 </style>
 </head>
 <body>
-<div class="login-box">
-  <div class="brand-mark">
-    <span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span><span class="bar b4"></span>
+<div class="login-container">
+  <div class="login-box">
+    <div class="brand-mark">
+      <span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span><span class="bar b4"></span>
+    </div>
+    <h1>Client Manager</h1>
+    <p class="subtitle">Entre com suas credenciais</p>
+    <form id="login-form">
+      <label>Usuário
+        <input type="text" id="username" autocomplete="username" required placeholder="seu usuário">
+      </label>
+      <label>Senha
+        <input type="password" id="password" autocomplete="current-password" required placeholder="••••••••">
+      </label>
+      <button type="submit" class="btn">Entrar</button>
+      <p class="error" id="error-msg"></p>
+    </form>
   </div>
-  <h1>Client Manager</h1>
-  <p>Entre com suas credenciais</p>
-  <form id="login-form">
-    <label>Usuário
-      <input type="text" id="username" autocomplete="username" required>
-    </label>
-    <label>Senha
-      <input type="password" id="password" autocomplete="current-password" required>
-    </label>
-    <button type="submit" class="btn">Entrar</button>
-    <p class="error" id="error-msg"></p>
-  </form>
 </div>
 <script>
 document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -49,7 +295,12 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
   const errorEl = document.getElementById('error-msg');
+  const btn = e.target.querySelector('.btn');
   errorEl.style.display = 'none';
+  
+  btn.textContent = 'Entrando...';
+  btn.style.opacity = '0.7';
+  btn.disabled = true;
 
   try {
     const res = await fetch('/api/auth/login', {
@@ -59,14 +310,21 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (res.ok && data.ok) {
+      btn.textContent = '✓ Redirecionando...';
       window.location.href = '/';
     } else {
       errorEl.textContent = data.error || 'Erro ao fazer login.';
       errorEl.style.display = 'block';
+      btn.textContent = 'Entrar';
+      btn.style.opacity = '1';
+      btn.disabled = false;
     }
   } catch {
     errorEl.textContent = 'Erro de conexão.';
     errorEl.style.display = 'block';
+    btn.textContent = 'Entrar';
+    btn.style.opacity = '1';
+    btn.disabled = false;
   }
 });
 </script>

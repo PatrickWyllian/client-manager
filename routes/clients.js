@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { sendWelcomeMessage, buildRenewalMessage } = require('../services/scheduler');
-const { daysUntil, formatDate } = require('../lib/dateHelpers');
+const { daysUntil, formatDate, addMonthsPreservingDay } = require('../lib/dateHelpers');
+const { encryptText, decryptText } = require('../lib/crypto');
 const { NotFoundError, ValidationError } = require('../lib/errors');
 const { validateClient } = require('../lib/validators');
 
 module.exports = (waService) => {
-  // Listar clientes (com filtros opcionais: server_id, status, expiring_in)
+  // Listar clientes (com filtros opcionais: server_id, status, plan, filter_name)
   router.get('/', (req, res) => {
     let query = `
       SELECT c.*, s.name AS server_name, COALESCE(s.cost * COALESCE(p.screens, 1) * COALESCE(p.duration_months, 1), 0) AS server_cost
@@ -34,6 +35,7 @@ module.exports = (waService) => {
 
     const clients = db.prepare(query).all(...params).map(c => ({
       ...c,
+      password: c.password ? decryptText(c.password) : null,
       days_until_due: daysUntil(c.due_date)
     }));
 
@@ -50,13 +52,17 @@ module.exports = (waService) => {
         WHERE c.id = ?
       `).get(req.params.id);
       if (!client) throw new NotFoundError('Cliente não encontrado.');
-      res.json({ ...client, days_until_due: daysUntil(client.due_date) });
+      res.json({
+        ...client,
+        password: client.password ? decryptText(client.password) : null,
+        days_until_due: daysUntil(client.due_date)
+      });
     } catch (err) {
       next(err);
     }
   });
 
-  // Criar cliente
+  // Criar cliente (Com Transação ACID)
   router.post('/', async (req, res, next) => {
     try {
       const validation = validateClient(req.body);
@@ -64,24 +70,43 @@ module.exports = (waService) => {
 
       const { name, phone, plan, price, discount, server_id, due_date, status, username, password, notes } = req.body;
 
-      const stmt = db.prepare(`
-        INSERT INTO clients (name, phone, plan, price, discount, server_id, due_date, status, username, password, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      const info = stmt.run(
-        name.trim(),
-        phone.trim(),
-        plan || null,
-        price || 0,
-        discount || 0,
-        server_id || null,
-        due_date,
-        status || 'ativo',
-        username || null,
-        password || null,
-        notes || null
-      );
-      const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(info.lastInsertRowid);
+      // Criptografia de senha do servidor
+      const encPassword = password ? encryptText(password.trim()) : null;
+
+      // Transação atômica
+      const createTransaction = db.transaction(() => {
+        const stmt = db.prepare(`
+          INSERT INTO clients (name, phone, plan, price, discount, server_id, due_date, status, username, password, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const info = stmt.run(
+          name.trim(),
+          phone.trim(),
+          plan || null,
+          price || 0,
+          discount || 0,
+          server_id || null,
+          due_date,
+          status || 'ativo',
+          username || null,
+          encPassword,
+          notes || null
+        );
+
+        const clientId = info.lastInsertRowid;
+
+        // Registrar venda
+        const saleValue = (price || 0) - (discount || 0);
+        if (saleValue > 0) {
+          db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'novo', ?, date('now'))")
+            .run(clientId, saleValue);
+        }
+
+        return clientId;
+      });
+
+      const newClientId = createTransaction();
+      const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(newClientId);
 
       // Enviar mensagem de boas-vindas via WhatsApp
       if (waService && client.status === 'ativo') {
@@ -92,19 +117,18 @@ module.exports = (waService) => {
             LEFT JOIN servers s ON s.id = c.server_id
             WHERE c.id = ?
           `).get(client.id);
+          // Pass plain password to message generator
+          clientFull.password = password ? password.trim() : null;
           await sendWelcomeMessage(waService, clientFull);
         } catch (err) {
           console.error('[clients] Erro ao enviar boas-vindas:', err.message);
         }
       }
 
-      // Registrar venda
-      const saleValue = (price || 0) - (discount || 0);
-      if (saleValue > 0) {
-        db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'novo', ?, date('now'))")
-          .run(client.id, saleValue);
-      }
-      res.status(201).json(client);
+      res.status(201).json({
+        ...client,
+        password: password || null
+      });
     } catch (err) {
       next(err);
     }
@@ -117,6 +141,11 @@ module.exports = (waService) => {
       if (!existing) throw new NotFoundError('Cliente não encontrado.');
 
       const { name, phone, plan, price, discount, server_id, due_date, status, username, password, notes } = req.body;
+      
+      const encPassword = password !== undefined
+        ? (password ? encryptText(password.trim()) : null)
+        : existing.password;
+
       db.prepare(`
         UPDATE clients SET name = ?, phone = ?, plan = ?, price = ?, discount = ?, server_id = ?,
           due_date = ?, status = ?, username = ?, password = ?, notes = ? WHERE id = ?
@@ -130,18 +159,21 @@ module.exports = (waService) => {
         due_date ?? existing.due_date,
         status ?? existing.status,
         username ?? existing.username,
-        password ?? existing.password,
+        encPassword,
         notes ?? existing.notes,
         req.params.id
       );
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
-      res.json(updated);
+      res.json({
+        ...updated,
+        password: updated.password ? decryptText(updated.password) : null
+      });
     } catch (err) {
       next(err);
     }
   });
 
-  // Renovar cliente
+  // Renovar cliente (Com Transação ACID e Cálculo Robusto de Data)
   router.post('/:id/renew', async (req, res, next) => {
     try {
       const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
@@ -162,19 +194,25 @@ module.exports = (waService) => {
       const baseDate = currentDue && currentDue > renewal
         ? new Date(currentDue.getTime())
         : new Date(renewal.getTime());
-      baseDate.setMonth(baseDate.getMonth() + months);
-      const newDue = formatDate(baseDate);
-
-      db.prepare("UPDATE clients SET due_date = ?, status = 'ativo' WHERE id = ?").run(newDue, client.id);
+      // Algoritmo robusto que previne estouro de meses curtos (ex: Jan 31 -> Feb 28/29)
+      const targetDate = addMonthsPreservingDay(baseDate, months);
+      const newDue = formatDate(targetDate);
       const renewValue = (client.price || 0) - (client.discount || 0);
-      if (renewValue > 0) {
-        db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'renovacao', ?, ?)")
-          .run(client.id, renewValue, renewal_date);
-      }
+
+      // Transação Atômica ACID
+      const renewTransaction = db.transaction(() => {
+        db.prepare("UPDATE clients SET due_date = ?, status = 'ativo' WHERE id = ?").run(newDue, client.id);
+        if (renewValue > 0) {
+          db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'renovacao', ?, ?)")
+            .run(client.id, renewValue, renewal_date);
+        }
+      });
+
+      renewTransaction();
 
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(client.id);
 
-      // Sempre enfileirar mensagem de renovação (mesmo se WhatsApp desconectado)
+      // Enfileirar mensagem de renovação
       if (waService) {
         try {
           const clientFull = db.prepare(`
@@ -189,7 +227,11 @@ module.exports = (waService) => {
           console.error('[clients] Erro ao enfileirar renovação:', err.message);
         }
       }
-      res.json({ ...updated, days_until_due: daysUntil(updated.due_date) });
+      res.json({
+        ...updated,
+        password: updated.password ? decryptText(updated.password) : null,
+        days_until_due: daysUntil(updated.due_date)
+      });
     } catch (err) {
       next(err);
     }
