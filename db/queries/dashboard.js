@@ -1,7 +1,23 @@
 const db = require('../connection');
 
+function getActiveClientsCount() {
+  return db.prepare("SELECT COUNT(*) c FROM clients WHERE status = 'ativo'").get().c;
+}
+
 function getActiveServersCount() {
   return db.prepare("SELECT COUNT(*) c FROM servers WHERE status = 'ativo'").get().c;
+}
+
+function getMonthlyRecurringRevenue() {
+  return db.prepare(`
+    SELECT COALESCE(SUM((c.price - COALESCE(c.discount, 0)) / COALESCE(p.duration_months, 1)), 0) AS totalMRR
+    FROM clients c LEFT JOIN plans p ON p.name = c.plan
+    WHERE c.status = 'ativo'
+  `).get().totalMRR;
+}
+
+function getCancelledLast30Days(dateStr) {
+  return db.prepare("SELECT COUNT(*) c FROM clients WHERE status = 'cancelado' AND created_at >= ?").get(dateStr).c;
 }
 
 function getMonthlyServerCost() {
@@ -94,37 +110,6 @@ function getMonthSalesTotals(month) {
     WHERE s.sale_date >= ? AND s.sale_date <= ?
   `).get(`${month}-01`, `${month}-${String(endDay).padStart(2,'0')}`);
 }
-function getMonthlySnapshot(month) {
-  const [y, m] = month.split('-').map(Number);
-  const endDay = new Date(y, m, 0).getDate();
-  const monthEndStr = `${month}-${String(endDay).padStart(2,'0')}`;
-  const activeRows = db.prepare(`
-    SELECT c.id, c.plan, c.price, c.discount, c.due_date,
-      COALESCE(p.duration_months, 1) AS duration_months
-    FROM clients c
-    LEFT JOIN plans p ON p.name = c.plan
-    WHERE c.status = 'ativo' AND c.due_date >= ?
-  `).all(monthEndStr);
-  const mrr = activeRows.reduce((sum, c) => sum + ((c.price - (c.discount || 0)) / (c.duration_months || 1)), 0);
-  const totalActive = activeRows.length;
-  const cancelledCount = db.prepare(`
-    SELECT COUNT(*) AS cnt FROM clients
-    WHERE status IN ('expirado','cancelado')
-    AND due_date >= ? AND due_date <= ?
-  `).get(`${month}-01`, monthEndStr).cnt;
-  const expiringSoonCount = activeRows.filter(c => {
-    const d = new Date(c.due_date + 'T00:00:00');
-    const end = new Date(monthEndStr + 'T00:00:00');
-    const diff = Math.round((d - end) / (1000 * 60 * 60 * 24));
-    return diff >= 0 && diff <= 7;
-  }).length;
-  return {
-    totalActive,
-    mrr: Math.round(mrr * 100) / 100,
-    cancelledCount,
-    expiringSoonCount
-  };
-}
 function getMonthlyProfitHistory(monthsBack) {
   const now = new Date();
   const result = [];
@@ -165,15 +150,17 @@ function getMonthlyProfitHistory(monthsBack) {
 }
 
 module.exports = {
+  getActiveClientsCount,
   getActiveServersCount,
+  getMonthlyRecurringRevenue,
   getMonthlyServerCost,
   getAllActiveClients,
+  getCancelledLast30Days,
   getExpiredClients,
   getExpiredCount,
   getExpiredRevenue,
   getServerRanking,
   getPlanDistribution,
   getMonthSalesTotals,
-  getMonthlySnapshot,
   getMonthlyProfitHistory
 };
