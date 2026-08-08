@@ -1,5 +1,6 @@
 const db = require('../db/database');
 const { EventEmitter } = require('events');
+const { normalizePhone } = require('../lib/validators');
 
 /**
  * Spintax parser: replaces {option1|option2|option3} with a random choice
@@ -78,7 +79,11 @@ class MessageQueue extends EventEmitter {
 
       // Aplica Spintax nas mensagens para variação anti-spam
       const finalMessage = parseSpintax(pending.message);
-      const jid = `${pending.phone.replace(/\D/g, '')}@s.whatsapp.net`;
+      const normalized = normalizePhone(pending.phone);
+      if (!normalized) {
+        throw new Error(`Telefone inválido: ${pending.phone}`);
+      }
+      const jid = `${normalized}@s.whatsapp.net`;
       await this.waService.sock.sendMessage(jid, { text: finalMessage });
 
       db.prepare(
@@ -87,7 +92,21 @@ class MessageQueue extends EventEmitter {
 
       this.emit('queue:sent', pending);
 
+      // Emitir via Socket.IO para o frontend saber que a mensagem foi entregue
       if (this.io) {
+        // Buscar nome do cliente se tiver client_id
+        let clientName = pending.phone;
+        if (pending.client_id) {
+          const client = db.prepare("SELECT name FROM clients WHERE id = ?").get(pending.client_id);
+          if (client) clientName = client.name;
+        }
+        this.io.emit('wa:message-sent', {
+          id: pending.id,
+          client_id: pending.client_id,
+          clientName,
+          phone: pending.phone,
+          type: pending.type
+        });
         this.io.emit('wa:queue-update', this.getQueueStatus());
       }
     } catch (err) {
@@ -97,6 +116,23 @@ class MessageQueue extends EventEmitter {
       ).run(err.message, pending.id);
 
       this.emit('queue:error', { ...pending, error: err.message });
+
+      if (this.io) {
+        let clientName = pending.phone;
+        if (pending.client_id) {
+          const client = db.prepare("SELECT name FROM clients WHERE id = ?").get(pending.client_id);
+          if (client) clientName = client.name;
+        }
+        this.io.emit('wa:message-error', {
+          id: pending.id,
+          client_id: pending.client_id,
+          clientName,
+          phone: pending.phone,
+          type: pending.type,
+          error: err.message
+        });
+        this.io.emit('wa:queue-update', this.getQueueStatus());
+      }
     } finally {
       this.processing = false;
       const isCron = pending.type === 'reminder' || pending.type === 'recovery' || pending.type === 'post_expiry';

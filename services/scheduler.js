@@ -226,7 +226,7 @@ async function runReminderCheck(waService, io) {
         "INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, 'reminder')"
       ).run(client.id, client.due_date);
       queuedCount++;
-      if (io) io.emit('reminder:sent', { client: client.name, due_date: client.due_date });
+      // Log de dedução — o toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
       console.error(`Falha ao enfileirar mensagem para ${client.name}:`, err.message);
     }
@@ -283,7 +283,7 @@ async function runRecoveryCheck(waService, io) {
       ).run(client.id, client.due_date);
       queuedCount++;
       console.log(`[scheduler] Recuperação enfileirada para ${client.name} (${queuedCount}/${toSend.length})`);
-      if (io) io.emit('recovery:sent', { client: client.name, due_date: client.due_date });
+      // Toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
       console.error(`[scheduler] Falha ao enfileirar recuperação para ${client.name}:`, err.message);
     }
@@ -336,7 +336,7 @@ async function runPostExpiryCheck(waService, io) {
       ).run(client.id, client.due_date);
       queuedCount++;
       console.log(`[scheduler] Pós-vencimento enfileirado para ${client.name} (${queuedCount}/${candidates.length})`);
-      if (io) io.emit('post_expiry:sent', { client: client.name, due_date: client.due_date });
+      // Toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
       console.error(`[scheduler] Falha ao enfileirar pós-vencimento para ${client.name}:`, err.message);
     }

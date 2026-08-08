@@ -288,6 +288,7 @@ async function loadClients(){
         <td class="row-actions">
           <button onclick="editClient(${c.id})">Editar</button>
           <button class="btn-renew" onclick="renewClient(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Renovar</button>
+          ${c.status === 'expirado' ? `<button class="btn-recovery" onclick="sendRecovery(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Recuperação</button>` : ''}
           <button onclick="deleteClient(${c.id})">Excluir</button>
         </td>
       </tr>`;
@@ -729,8 +730,14 @@ function renderWaStatus(data){
 }
 
 socket.on('wa:status', renderWaStatus);
-socket.on('reminder:sent', (data)=> toast(`Aviso enviado para ${data.client}`));
-socket.on('recovery:sent', (data)=> toast(`Recuperação enviada para ${data.client}`));
+// Toasts de envio real (confirmado pela fila após entrega ao WhatsApp)
+socket.on('wa:message-sent', (data) => {
+  const typeLabel = { reminder: 'Lembrete', recovery: 'Recuperação', post_expiry: 'Pós-vencimento', renewal: 'Renovação', welcome: 'Boas-vindas', manual: 'Mensagem' };
+  toast(`✓ ${typeLabel[data.type] || 'Mensagem'} enviada para ${data.clientName}.`);
+});
+socket.on('wa:message-error', (data) => {
+  toast(`✗ Falha ao enviar para ${data.clientName}: ${data.error}`, true);
+});
 
 document.getElementById('btn-wa-connect').addEventListener('click', async ()=>{
   try{ await api('/whatsapp/connect', {method:'POST'}); } catch(err){ toast(err.message, true); }
@@ -744,8 +751,11 @@ window.sendRecovery = async (id, name) => {
   if (!confirm(`Enviar mensagem de recuperação para ${name}?`)) return;
   try {
     const result = await api('/whatsapp/send-recovery', { method: 'POST', body: JSON.stringify({ client_id: id }) });
-    toast(`Mensagem de recuperação enfileirada para ${result.client}.`);
-    loadDashboard();
+    const label = result.type === 'recovery' ? 'recuperação' : 'pós-vencimento';
+    toast(`Mensagem de ${label} enfileirada para ${result.client} (${result.days_expired}d vencido).`);
+    // Recarrega a aba ativa (dashboard ou clientes)
+    if (typeof loadDashboard === 'function' && document.getElementById('tab-dashboard')?.classList.contains('active')) loadDashboard();
+    if (typeof loadClients === 'function' && document.getElementById('tab-clientes')?.classList.contains('active')) loadClients();
   } catch(err) { toast(err.message, true); }
 };
 

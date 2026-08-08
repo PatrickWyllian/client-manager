@@ -9,6 +9,7 @@ const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
+const { normalizePhone } = require('../lib/validators');
 
 const AUTH_DIR = path.join(__dirname, '..', 'data', 'wa-auth');
 
@@ -161,8 +162,22 @@ class WhatsAppService {
     if (this.status !== 'connected' || !this.sock) {
       throw new Error('WhatsApp não está conectado.');
     }
-    const jid = `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
-    await this.sock.sendMessage(jid, { text });
+    const normalized = normalizePhone(phone);
+    if (!normalized) throw new Error('Telefone inválido.');
+    const jid = `${normalized}@s.whatsapp.net`;
+    let result;
+    try {
+      result = await this.sock.sendMessage(jid, { text });
+    } catch (err) {
+      // Captura o erro real do Baileys para não mascarar como "enviado"
+      console.error('[whatsapp] Falha ao enviar mensagem para', jid, '—', err.message);
+      throw err;
+    }
+    // Em alguns fluxos o Baileys resolve sem confirmação de status; checa o retorno
+    if (result && result.status && String(result.status).startsWith('ERROR')) {
+      throw new Error(`WhatsApp rejeitou a mensagem (status ${result.status}).`);
+    }
+    return result;
   }
 }
 
