@@ -88,6 +88,35 @@ function runMigrations() {
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     )
   `);
+
+  // ── REVENDEDORES ──────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resellers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      phone TEXT,
+      email TEXT,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reseller_credit_purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reseller_id INTEGER NOT NULL,
+      server_id INTEGER,
+      credits_qty INTEGER NOT NULL DEFAULT 0,
+      amount_paid REAL NOT NULL DEFAULT 0,
+      cost_per_credit REAL NOT NULL DEFAULT 0,
+      purchase_date TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
+    )
+  `);
 }
 
 module.exports = runMigrations;

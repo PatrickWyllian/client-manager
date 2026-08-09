@@ -8,3 +8,4 @@ data/database.sqlite
 cookies.txt
 server.log
 *.bak
+client-manager/

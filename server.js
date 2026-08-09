@@ -95,6 +95,7 @@ app.use('/api/whatsapp', require('./routes/whatsapp')(waService, messageQueue));
 app.use('/api/sales', require('./routes/sales'));
 app.use('/api/settings', require('./routes/settings')(waService, io));
 app.use('/api/export', require('./routes/export'));
+app.use('/api/resellers', require('./routes/resellers'));
 
 // Redirect to login for non-API, non-static routes
 app.get('*', (req, res, next) => {

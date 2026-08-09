@@ -6,3 +6,6 @@ data/database.sqlite
 .env
 .mimocode
 .git
+cookies.txt
+client-manager/
+data/backups/
