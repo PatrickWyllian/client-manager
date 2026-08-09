@@ -53,6 +53,12 @@
           Financeiro
         </span>
       </button>
+      <button class="nav-item" data-tab="revendedores">
+        <span class="nav-label">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/><circle cx="12" cy="12" r="3"/></svg>
+          Revendedores
+        </span>
+      </button>
       <button class="nav-item" data-tab="planos">
         <span class="nav-label">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -319,6 +325,66 @@
         </div>
       </div>
     </section>
+
+    <!-- REVENDEDORES -->
+    <section class="tab-panel" id="tab-revendedores">
+      <header class="panel-header">
+        <h1>Revendedores</h1>
+        <p>Gerencie revendedores e suas compras de créditos.</p>
+        <button class="btn-primary" id="btn-new-reseller">+ Novo revendedor</button>
+      </header>
+
+      <!-- KPIs Revendedores -->
+      <div class="stat-grid">
+        <div class="stat-card accent">
+          <span class="stat-label">Revendedores ativos</span>
+          <span class="stat-value" id="rev-active-count">—</span>
+        </div>
+        <div class="stat-card accent">
+          <span class="stat-label">Créditos vendidos</span>
+          <span class="stat-value" id="rev-total-credits">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Receita total</span>
+          <span class="stat-value" id="rev-total-revenue">—</span>
+        </div>
+        <div class="stat-card warn">
+          <span class="stat-label">Lucro líquido</span>
+          <span class="stat-value" id="rev-total-profit">—</span>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:20px">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>Telefone</th><th>Email</th><th>Status</th><th>Compras</th><th>Créditos</th><th>Receita</th><th>Lucro</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="resellers-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Compras de créditos -->
+      <div class="card" style="margin-top:20px">
+        <div class="queue-header">
+          <h2>Compras de créditos</h2>
+          <button class="btn-primary" id="btn-new-purchase">+ Nova compra</button>
+        </div>
+        <div class="table-wrap" style="margin-top:12px">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Data</th><th>Revendedor</th><th>Servidor</th><th>Qtd. Créditos</th><th>Valor Pago</th><th>Custo/Crédito</th><th>Lucro</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="purchases-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHATSAPP -->
     <section class="tab-panel" id="tab-whatsapp">
       <header class="panel-header">
         <h1>WhatsApp</h1>
@@ -572,6 +638,52 @@
     <div class="modal-actions">
       <button class="btn-secondary" id="renew-cancel">Cancelar</button>
       <button class="btn-primary" id="renew-confirm">Confirmar renovação</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Revendedor -->
+<div class="modal-overlay" id="reseller-modal">
+  <div class="modal">
+    <h2 id="reseller-modal-title">Novo revendedor</h2>
+    <input type="hidden" id="reseller-id">
+    <label>Nome <input type="text" id="reseller-name"></label>
+    <label>Telefone (com DDI, ex: 5521999999999) <input type="text" id="reseller-phone"></label>
+    <label>Email <input type="email" id="reseller-email"></label>
+    <label>Status
+      <select id="reseller-status">
+        <option value="ativo">Ativo</option>
+        <option value="inativo">Inativo</option>
+      </select>
+    </label>
+    <label>Observações <textarea id="reseller-notes" rows="3"></textarea></label>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="reseller-cancel">Cancelar</button>
+      <button class="btn-primary" id="reseller-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Compra de Créditos -->
+<div class="modal-overlay" id="purchase-modal">
+  <div class="modal">
+    <h2 id="purchase-modal-title">Nova compra de créditos</h2>
+    <input type="hidden" id="purchase-id">
+    <label>Revendedor
+      <select id="purchase-reseller"></select>
+    </label>
+    <label>Servidor (opcional)
+      <select id="purchase-server"></select>
+    </label>
+    <label>Quantidade de créditos <input type="number" id="purchase-qty" min="1" value="1"></label>
+    <label>Valor pago (R$) <input type="number" step="0.01" id="purchase-amount" value="0"></label>
+    <label>Custo por crédito (R$) <input type="number" step="0.01" id="purchase-cost" value="0"></label>
+    <label>Data da compra <input type="date" id="purchase-date"></label>
+    <label>Observações <textarea id="purchase-notes" rows="2"></textarea></label>
+    <p class="hint" id="purchase-profit-preview" style="color:var(--accent);"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="purchase-cancel">Cancelar</button>
+      <button class="btn-primary" id="purchase-save">Salvar</button>
     </div>
   </div>
 </div>

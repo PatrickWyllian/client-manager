@@ -1975,3 +1975,33 @@ input[type="time"]:focus {
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
 .stagger-5 { animation-delay: 0.25s; }
+
+/* ── REVENDEDORES ─────────────────────────────────────────────────── */
+.rev-profit-pos { color: var(--success, #10b981); font-weight: 600; }
+.rev-profit-neg { color: var(--danger, #ef4444); font-weight: 600; }
+.status-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
+.badge-active { background: var(--success-dim, rgba(16,185,129,0.15)); color: var(--success, #10b981); border: 1px solid var(--success-glow, rgba(16,185,129,0.3)); }
+.badge-inactive { background: var(--muted-dim, rgba(100,116,139,0.15)); color: var(--text-muted, #94a3b8); border: 1px solid var(--muted-glow, rgba(100,116,139,0.3)); }
+.btn-icon { background: transparent; border: none; cursor: pointer; font-size: 0.9rem; padding: 4px 6px; border-radius: 6px; opacity: 0.7; transition: opacity 0.15s, background 0.15s; }
+.btn-icon:hover { opacity: 1; background: var(--glass-hover, rgba(255,255,255,0.06)); }
+.queue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.queue-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.queue-stat { background: var(--glass, rgba(255,255,255,0.03)); border: 1px solid var(--glass-border, rgba(255,255,255,0.08)); border-radius: 10px; padding: 12px; text-align: center; }
+.queue-stat-label { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.queue-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.queue-pending h3, .queue-history h3, .queue-current h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.queue-list { max-height: 300px; overflow-y: auto; }
+.queue-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--glass, rgba(255,255,255,0.03)); border: 1px solid var(--glass-border, rgba(255,255,255,0.08)); border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; }
+.queue-item.sending { border-color: var(--accent, #00e5ff); box-shadow: 0 0 0 1px var(--accent-dim, rgba(0,229,255,0.15)); }
+.queue-item-error { border-color: var(--danger, #ef4444); }
+.queue-item-sent { border-color: var(--success, #10b981); }
+.queue-item-type { background: var(--accent-dim, rgba(0,229,255,0.15)); color: var(--accent, #00e5ff); padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.queue-item-phone { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-muted); }
+.queue-item-status { margin-left: auto; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+.queue-item-status.pending { background: var(--warn-dim, rgba(251,191,36,0.15)); color: var(--warn, #fbbf24); }
+.queue-item-status.sending { background: var(--accent-dim, rgba(0,229,255,0.15)); color: var(--accent, #00e5ff); animation: pulse 1.5s infinite; }
+.queue-item-status.sent { background: var(--success-dim, rgba(16,185,129,0.15)); color: var(--success, #10b981); }
+.queue-item-status.error { background: var(--danger-dim, rgba(239,68,68,0.15)); color: var(--danger, #ef4444); }
+@media (max-width: 900px) {
+  .queue-stats { grid-template-columns: repeat(2, 1fr); }
+}

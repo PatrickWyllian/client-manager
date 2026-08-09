@@ -142,6 +142,7 @@ document.querySelectorAll('.nav-item').forEach(btn=>{
     if(btn.dataset.tab === 'servidores') loadServers();
     if(btn.dataset.tab === 'planos') loadPlans();
     if(btn.dataset.tab === 'financeiro') loadFinanceiro();
+    if(btn.dataset.tab === 'revendedores') loadResellers();
   });
 });
 
@@ -848,6 +849,11 @@ function formatTime(dateStr) {
   const d = new Date(dateStr + 'Z');
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 window.cancelQueueItem = async (id) => {
   try {
@@ -953,6 +959,193 @@ document.getElementById('btn-save-settings').addEventListener('click', async ()=
     toast('Configurações salvas. Horários atualizados!');
   }catch(err){ toast(err.message, true); }
 });
+
+// ---------- INICIALIZAÇÃO ----------
+// ---------- REVENDEDORES ----------
+let resellersCache = [];
+
+async function loadResellers() {
+  try {
+    const resellers = await api('/resellers');
+    resellersCache = resellers;
+    renderResellers(resellers);
+    renderResellerKPIs(resellers);
+    await loadPurchases();
+    populateResellerSelects();
+  } catch (err) { toast(err.message, true); }
+}
+
+function renderResellerKPIs(list) {
+  const active = list.filter(r => r.status === 'ativo');
+  const totalCredits = list.reduce((s, r) => s + (r.total_credits || 0), 0);
+  const totalRevenue = list.reduce((s, r) => s + (r.total_revenue || 0), 0);
+  const totalProfit = list.reduce((s, r) => s + (r.net_profit || 0), 0);
+  document.getElementById('rev-active-count').textContent = active.length;
+  document.getElementById('rev-total-credits').textContent = totalCredits;
+  document.getElementById('rev-total-revenue').textContent = 'R$ ' + totalRevenue.toFixed(2);
+  const profitEl = document.getElementById('rev-total-profit');
+  profitEl.textContent = 'R$ ' + totalProfit.toFixed(2);
+  profitEl.style.color = totalProfit >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)';
+}
+
+function renderResellers(list) {
+  const tbody = document.getElementById('resellers-tbody');
+  tbody.innerHTML = list.map(r => {
+    const profitClass = (r.net_profit || 0) >= 0 ? 'rev-profit-pos' : 'rev-profit-neg';
+    return `<tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.phone || '—')}</td>
+      <td>${escapeHtml(r.email || '—')}</td>
+      <td><span class="status-badge ${r.status === 'ativo' ? 'badge-active' : 'badge-inactive'}">${r.status}</span></td>
+      <td>${r.total_purchases || 0}</td>
+      <td>${r.total_credits || 0}</td>
+      <td>R$ ${(r.total_revenue || 0).toFixed(2)}</td>
+      <td class="${profitClass}">R$ ${(r.net_profit || 0).toFixed(2)}</td>
+      <td>
+        <button class="btn-icon" onclick="editReseller(${r.id})" title="Editar">✏️</button>
+        <button class="btn-icon" onclick="deleteReseller(${r.id})" title="Excluir">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadPurchases() {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const purchases = await api('/resellers/purchases/all?month=' + month);
+    renderPurchases(purchases);
+  } catch (err) { toast(err.message, true); }
+}
+
+function renderPurchases(list) {
+  const tbody = document.getElementById('purchases-tbody');
+  tbody.innerHTML = list.map(p => {
+    const profit = p.net_profit || 0;
+    const profitClass = profit >= 0 ? 'rev-profit-pos' : 'rev-profit-neg';
+    return `<tr>
+      <td>${formatDate(p.purchase_date)}</td>
+      <td>${escapeHtml(p.reseller_name || '—')}</td>
+      <td>${escapeHtml(p.server_name || '—')}</td>
+      <td>${p.credits_qty}</td>
+      <td>R$ ${(p.amount_paid || 0).toFixed(2)}</td>
+      <td>R$ ${(p.cost_per_credit || 0).toFixed(2)}</td>
+      <td class="${profitClass}">R$ ${profit.toFixed(2)}</td>
+      <td>
+        <button class="btn-icon" onclick="editPurchase(${p.id})" title="Editar">✏️</button>
+        <button class="btn-icon" onclick="deletePurchase(${p.id})" title="Excluir">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function populateResellerSelects() {
+  const resellerSelect = document.getElementById('purchase-reseller');
+  resellerSelect.innerHTML = '<option value="">Selecione...</option>' +
+    resellersCache.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+  const serverSelect = document.getElementById('purchase-server');
+  serverSelect.innerHTML = '<option value="">Nenhum</option>' +
+    serversCache.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+}
+
+// Modal Revendedor
+document.getElementById('btn-new-reseller').addEventListener('click', () => openResellerModal());
+window.editReseller = async function(id) {
+  const r = await api('/resellers/' + id);
+  openResellerModal(r);
+};
+function openResellerModal(r = {}) {
+  document.getElementById('reseller-modal-title').textContent = r.id ? 'Editar revendedor' : 'Novo revendedor';
+  document.getElementById('reseller-id').value = r.id || '';
+  document.getElementById('reseller-name').value = r.name || '';
+  document.getElementById('reseller-phone').value = r.phone || '';
+  document.getElementById('reseller-email').value = r.email || '';
+  document.getElementById('reseller-status').value = r.status || 'ativo';
+  document.getElementById('reseller-notes').value = r.notes || '';
+  document.getElementById('reseller-modal').classList.add('active');
+}
+document.getElementById('reseller-cancel').addEventListener('click', () => {
+  document.getElementById('reseller-modal').classList.remove('active');
+});
+document.getElementById('reseller-save').addEventListener('click', async () => {
+  const id = document.getElementById('reseller-id').value;
+  const data = {
+    name: document.getElementById('reseller-name').value,
+    phone: document.getElementById('reseller-phone').value,
+    email: document.getElementById('reseller-email').value,
+    status: document.getElementById('reseller-status').value,
+    notes: document.getElementById('reseller-notes').value
+  };
+  try {
+    if (id) { await api('/resellers/' + id, { method: 'PUT', body: JSON.stringify(data) }); toast('Revendedor atualizado!'); }
+    else { await api('/resellers', { method: 'POST', body: JSON.stringify(data) }); toast('Revendedor criado!'); }
+    document.getElementById('reseller-modal').classList.remove('active');
+    loadResellers();
+  } catch (err) { toast(err.message, true); }
+});
+window.deleteReseller = async function(id) {
+  if (!confirm('Excluir este revendedor?')) return;
+  try { await api('/resellers/' + id, { method: 'DELETE' }); toast('Revendedor excluído.'); loadResellers(); }
+  catch (err) { toast(err.message, true); }
+};
+
+// Modal Compra
+document.getElementById('btn-new-purchase').addEventListener('click', () => openPurchaseModal());
+window.editPurchase = async function(id) {
+  const purchases = await api('/resellers/purchases/all');
+  const p = purchases.find(x => x.id === id);
+  if (p) openPurchaseModal(p);
+};
+function openPurchaseModal(p = {}) {
+  document.getElementById('purchase-modal-title').textContent = p.id ? 'Editar compra' : 'Nova compra de créditos';
+  document.getElementById('purchase-id').value = p.id || '';
+  document.getElementById('purchase-reseller').value = p.reseller_id || '';
+  document.getElementById('purchase-server').value = p.server_id || '';
+  document.getElementById('purchase-qty').value = p.credits_qty || 1;
+  document.getElementById('purchase-amount').value = p.amount_paid || 0;
+  document.getElementById('purchase-cost').value = p.cost_per_credit || 0;
+  document.getElementById('purchase-date').value = p.purchase_date || new Date().toISOString().slice(0, 10);
+  document.getElementById('purchase-notes').value = p.notes || '';
+  updatePurchaseProfitPreview();
+  document.getElementById('purchase-modal').classList.add('active');
+}
+function updatePurchaseProfitPreview() {
+  const qty = parseFloat(document.getElementById('purchase-qty').value) || 0;
+  const amount = parseFloat(document.getElementById('purchase-amount').value) || 0;
+  const cost = parseFloat(document.getElementById('purchase-cost').value) || 0;
+  const profit = amount - (cost * qty);
+  const el = document.getElementById('purchase-profit-preview');
+  el.textContent = 'Lucro: R$ ' + profit.toFixed(2);
+  el.style.color = profit >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)';
+}
+['purchase-qty', 'purchase-amount', 'purchase-cost'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePurchaseProfitPreview);
+});
+document.getElementById('purchase-cancel').addEventListener('click', () => {
+  document.getElementById('purchase-modal').classList.remove('active');
+});
+document.getElementById('purchase-save').addEventListener('click', async () => {
+  const id = document.getElementById('purchase-id').value;
+  const data = {
+    reseller_id: parseInt(document.getElementById('purchase-reseller').value),
+    server_id: document.getElementById('purchase-server').value || null,
+    credits_qty: parseInt(document.getElementById('purchase-qty').value),
+    amount_paid: parseFloat(document.getElementById('purchase-amount').value),
+    cost_per_credit: parseFloat(document.getElementById('purchase-cost').value),
+    purchase_date: document.getElementById('purchase-date').value,
+    notes: document.getElementById('purchase-notes').value
+  };
+  try {
+    if (id) { await api('/resellers/purchases/' + id, { method: 'PUT', body: JSON.stringify(data) }); toast('Compra atualizada!'); }
+    else { await api('/resellers/purchases', { method: 'POST', body: JSON.stringify(data) }); toast('Compra registrada!'); }
+    document.getElementById('purchase-modal').classList.remove('active');
+    loadResellers();
+  } catch (err) { toast(err.message, true); }
+});
+window.deletePurchase = async function(id) {
+  if (!confirm('Excluir esta compra?')) return;
+  try { await api('/resellers/purchases/' + id, { method: 'DELETE' }); toast('Compra excluída.'); loadResellers(); }
+  catch (err) { toast(err.message, true); }
+};
 
 // ---------- INICIALIZAÇÃO ----------
 async function init() {
