@@ -960,9 +960,14 @@ document.getElementById('btn-save-settings').addEventListener('click', async ()=
   }catch(err){ toast(err.message, true); }
 });
 
-// ---------- INICIALIZAÇÃO ----------
 // ---------- REVENDEDORES ----------
 let resellersCache = [];
+
+const MONTH_LABELS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function fmtRevMonthLabel(m) {
+  const parts = m.split('-');
+  return MONTH_LABELS[parseInt(parts[1],10)-1] + ' ' + parts[0];
+}
 
 async function loadResellers() {
   try {
@@ -972,7 +977,91 @@ async function loadResellers() {
     renderResellerKPIs(resellers);
     await loadPurchases();
     populateResellerSelects();
+    await loadResellerReport();
   } catch (err) { toast(err.message, true); }
+}
+
+async function loadResellerReport() {
+  try {
+    const monthInput = document.getElementById('revendedores-month');
+    const month = monthInput.value || new Date().toISOString().slice(0, 7);
+
+    const [summary, history] = await Promise.all([
+      api('/resellers/report/summary?month=' + month),
+      api('/resellers/report/history')
+    ]);
+
+    renderResellerMonthlyKPIs(summary.kpis);
+    renderResellerHistoryChart(history, month);
+    renderResellerBreakdown(summary.byReseller, month);
+  } catch (err) { toast(err.message, true); }
+}
+
+function renderResellerMonthlyKPIs(kpis) {
+  animateValue(document.getElementById('rev-month-purchases'), 0, kpis.total_purchases);
+  animateValue(document.getElementById('rev-month-credits'), 0, kpis.total_credits);
+  animateMoneyValue(document.getElementById('rev-month-revenue'), kpis.total_revenue);
+  animateMoneyValue(document.getElementById('rev-month-cost'), kpis.total_cost);
+  const profitEl = document.getElementById('rev-month-profit');
+  animateMoneyValue(profitEl, kpis.net_profit);
+  profitEl.style.color = kpis.net_profit >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)';
+}
+
+function renderResellerHistoryChart(history, selectedMonth) {
+  const container = document.getElementById('rev-history-chart');
+  if (!history || !history.length) {
+    container.innerHTML = '<p class="empty-msg">Sem histórico de compras.</p>';
+    return;
+  }
+
+  const maxVal = Math.max(1, ...history.map(h => Math.max(h.total_revenue, h.total_cost)));
+  const maxH = 170;
+  let html = '';
+
+  for (const h of history) {
+    const isSel = h.month === selectedMonth;
+    const revenueH = Math.max((h.total_revenue / maxVal) * maxH, 2);
+    const costH = Math.max((h.total_cost / maxVal) * maxH, 2);
+    html += `
+      <div class="proj-bar-group${isSel ? ' selected' : ''}">
+        <div class="proj-bar-value">${money(h.total_revenue)}</div>
+        <div class="proj-bar-stack" style="height:${revenueH}px">
+          <div class="proj-bar-safe" style="height:100%"></div>
+        </div>
+        <div class="proj-bar-stack" style="height:${costH}px;margin-top:2px">
+          <div class="proj-bar-risk" style="height:100%"></div>
+        </div>
+        <div class="proj-bar-label">${fmtRevMonthLabel(h.month)}</div>
+        <div class="proj-bar-sub">${h.purchase_count} compra${h.purchase_count !== 1 ? 's' : ''} · ${h.total_credits} créd.</div>
+      </div>`;
+  }
+
+  container.innerHTML = html;
+  staggerItems(container, '.proj-bar-group', 80);
+}
+
+function renderResellerBreakdown(byReseller, month) {
+  const labelEl = document.getElementById('rev-breakdown-month-label');
+  labelEl.textContent = fmtRevMonthLabel(month);
+
+  const tbody = document.getElementById('rev-breakdown-tbody');
+  const active = byReseller.filter(r => r.purchases > 0 || r.status === 'ativo');
+
+  tbody.innerHTML = active.length ? active.map(r => {
+    const profitClass = (r.net_profit || 0) >= 0 ? 'rev-profit-pos' : 'rev-profit-neg';
+    return `<tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.phone || '—')}</td>
+      <td><span class="status-badge ${r.status === 'ativo' ? 'badge-active' : 'badge-inactive'}">${r.status}</span></td>
+      <td>${r.purchases || 0}</td>
+      <td>${r.credits || 0}</td>
+      <td>R$ ${(r.revenue || 0).toFixed(2)}</td>
+      <td>R$ ${(r.cost || 0).toFixed(2)}</td>
+      <td class="${profitClass}">R$ ${(r.net_profit || 0).toFixed(2)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty-msg">Nenhum revendedor com compras neste mês.</td></tr>';
+
+  staggerItems(tbody, 'tr', 30);
 }
 
 function renderResellerKPIs(list) {
@@ -1011,7 +1100,8 @@ function renderResellers(list) {
 
 async function loadPurchases() {
   try {
-    const month = new Date().toISOString().slice(0, 7);
+    const monthInput = document.getElementById('revendedores-month');
+    const month = monthInput.value || new Date().toISOString().slice(0, 7);
     const purchases = await api('/resellers/purchases/all?month=' + month);
     renderPurchases(purchases);
   } catch (err) { toast(err.message, true); }
@@ -1046,6 +1136,13 @@ function populateResellerSelects() {
   serverSelect.innerHTML = '<option value="">Nenhum</option>' +
     serversCache.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
 }
+
+// Filtro de mês revendedores
+document.getElementById('revendedores-month').addEventListener('change', () => {
+  loadResellerReport();
+  loadPurchases();
+});
+document.getElementById('revendedores-month').value = new Date().toISOString().slice(0, 7);
 
 // Modal Revendedor
 document.getElementById('btn-new-reseller').addEventListener('click', () => openResellerModal());

@@ -334,7 +334,14 @@
         <button class="btn-primary" id="btn-new-reseller">+ Novo revendedor</button>
       </header>
 
-      <!-- KPIs Revendedores -->
+      <!-- Filtro de mês -->
+      <div class="financeiro-filters">
+        <label>Mês:
+          <input type="month" id="revendedores-month">
+        </label>
+      </div>
+
+      <!-- KPIs Revendedores (totais gerais) -->
       <div class="stat-grid">
         <div class="stat-card accent">
           <span class="stat-label">Revendedores ativos</span>
@@ -354,6 +361,57 @@
         </div>
       </div>
 
+      <!-- KPIs Mensais do mês selecionado -->
+      <div class="stat-grid" style="margin-top:14px">
+        <div class="stat-card accent">
+          <span class="stat-label">Compras no mês</span>
+          <span class="stat-value" id="rev-month-purchases">—</span>
+        </div>
+        <div class="stat-card accent">
+          <span class="stat-label">Créditos no mês</span>
+          <span class="stat-value" id="rev-month-credits">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Receita do mês</span>
+          <span class="stat-value" id="rev-month-revenue">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Custo do mês</span>
+          <span class="stat-value" id="rev-month-cost">—</span>
+        </div>
+        <div class="stat-card warn">
+          <span class="stat-label">Lucro do mês</span>
+          <span class="stat-value" id="rev-month-profit">—</span>
+        </div>
+      </div>
+
+      <!-- Gráfico histórico mensal -->
+      <div class="projection-card" style="margin-top:20px">
+        <h2>Compras de Créditos — Histórico Mensal</h2>
+        <div class="projection-chart" id="rev-history-chart"></div>
+        <div class="projection-legend">
+          <span class="legend-item"><span class="legend-dot safe"></span> Receita</span>
+          <span class="legend-item"><span class="legend-dot risk"></span> Custo</span>
+          <span class="legend-item"><span class="legend-line selected"></span> Mês selecionado</span>
+        </div>
+      </div>
+
+      <!-- Breakdown por revendedor no mês -->
+      <div class="card" style="margin-top:20px">
+        <h2>Detalhamento por revendedor — <span id="rev-breakdown-month-label">mês atual</span></h2>
+        <div class="table-wrap" style="margin-top:12px">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Revendedor</th><th>Telefone</th><th>Status</th><th>Compras</th><th>Créditos</th><th>Receita</th><th>Custo</th><th>Lucro</th>
+              </tr>
+            </thead>
+            <tbody id="rev-breakdown-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Lista de revendedores -->
       <div class="table-wrap" style="margin-top:20px">
         <table class="data-table">
           <thead>

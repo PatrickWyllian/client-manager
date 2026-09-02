@@ -220,7 +220,29 @@ router.delete('/purchases/:id', (req, res) => {
 // RELATÓRIO MENSAL
 // ══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/resellers/report?month=YYYY-MM
+// GET /api/resellers/report/history — histórico de todos os meses
+router.get('/report/history', (req, res) => {
+  const rows = db.prepare(`
+    SELECT
+      strftime('%Y-%m', purchase_date) AS month,
+      COUNT(*)                                  AS purchase_count,
+      COALESCE(SUM(credits_qty), 0)             AS total_credits,
+      COALESCE(SUM(amount_paid), 0)             AS total_revenue,
+      COALESCE(SUM(cost_per_credit * credits_qty), 0) AS total_cost
+    FROM reseller_credit_purchases
+    GROUP BY month
+    ORDER BY month ASC
+  `).all();
+
+  const result = rows.map(r => ({
+    ...r,
+    net_profit: r.total_revenue - r.total_cost
+  }));
+
+  res.json(result);
+});
+
+// GET /api/resellers/report/summary?month=YYYY-MM
 router.get('/report/summary', (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7);
 
