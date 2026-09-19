@@ -16,8 +16,14 @@ function getMonthlyRecurringRevenue() {
   `).get().totalMRR;
 }
 
-function getCancelledLast30Days(dateStr) {
-  return db.prepare("SELECT COUNT(*) c FROM clients WHERE status = 'cancelado' AND created_at >= ?").get(dateStr).c;
+function getChurnLast30Days(dateStr) {
+  // Churn = clientes que saíram (expirado OU cancelado) nos últimos 30 dias,
+  // usando o timestamp real da baixa (com fallback defensivo).
+  return db.prepare(`
+    SELECT COUNT(*) c FROM clients
+    WHERE status IN ('expirado', 'cancelado')
+      AND COALESCE(COALESCE(cancelled_at, expired_at), due_date) >= ?
+  `).get(dateStr).c;
 }
 
 function getMonthlyServerCost() {
@@ -27,6 +33,33 @@ function getMonthlyServerCost() {
     JOIN (SELECT server_id, COUNT(*) AS cnt FROM clients WHERE status = 'ativo' GROUP BY server_id) sub ON sub.server_id = s.id
     WHERE s.status = 'ativo'
   `).get().totalCost;
+}
+
+// Custo de servidores VIGENTE em um mês específico (janela de due_date + timestamps de baixa).
+// Conta como "ativo no mês M": cliente ativo cujo due_date cobre M, OU cliente que saiu
+// (expirado/cancelado) dentro de M. Aproximação mês-cheio (cliente ativo parte do mês conta mês inteiro).
+function getMonthlyServerCostByMonth(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const firstDay = `${monthStr}-01`;
+  const lastDay = `${monthStr}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  return db.prepare(`
+    SELECT COALESCE(SUM(s.cost * sub.cnt), 0) AS totalCost
+    FROM servers s
+    JOIN (
+      SELECT c.server_id AS server_id, COUNT(*) AS cnt
+      FROM clients c
+      WHERE c.server_id IS NOT NULL
+        AND (
+          (c.status = 'ativo' AND c.due_date >= ?)
+          OR (c.status = 'expirado' AND c.expired_at IS NOT NULL
+              AND substr(c.expired_at, 1, 10) >= ? AND substr(c.expired_at, 1, 10) <= ?)
+          OR (c.status = 'cancelado' AND c.cancelled_at IS NOT NULL
+              AND substr(c.cancelled_at, 1, 10) >= ? AND substr(c.cancelled_at, 1, 10) <= ?)
+        )
+      GROUP BY c.server_id
+    ) sub ON sub.server_id = s.id
+    WHERE s.status = 'ativo'
+  `).get(firstDay, firstDay, lastDay, firstDay, lastDay).totalCost;
 }
 
 function getAllActiveClients() {
@@ -128,13 +161,7 @@ function getMonthlyProfitHistory(monthsBack) {
       FROM sales s
       WHERE s.sale_date >= ? AND s.sale_date <= ?
     `).get(startStr, endStr);
-    const serverCostData = db.prepare(`
-      SELECT COALESCE(SUM(s.cost * sub.cnt), 0) AS totalCost
-      FROM servers s
-      JOIN (SELECT server_id, COUNT(*) AS cnt FROM clients WHERE status = 'ativo' GROUP BY server_id) sub ON sub.server_id = s.id
-      WHERE s.status = 'ativo'
-    `).get();
-    const serverCost = serverCostData.totalCost;
+    const serverCost = getMonthlyServerCostByMonth(month);
     const netProfit = totals.totalSales - serverCost;
     result.push({
       month,
@@ -155,12 +182,13 @@ module.exports = {
   getMonthlyRecurringRevenue,
   getMonthlyServerCost,
   getAllActiveClients,
-  getCancelledLast30Days,
+  getChurnLast30Days,
   getExpiredClients,
   getExpiredCount,
   getExpiredRevenue,
   getServerRanking,
   getPlanDistribution,
   getMonthSalesTotals,
+  getMonthlyServerCostByMonth,
   getMonthlyProfitHistory
 };

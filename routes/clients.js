@@ -79,9 +79,13 @@ module.exports = (waService) => {
 
       // Transação atômica
       const createTransaction = db.transaction(() => {
+        const createStatus = status || 'ativo';
+        const nowTs = db.prepare("SELECT datetime('now', 'localtime') t").get().t;
+        const createdExpiredAt = createStatus === 'expirado' ? nowTs : null;
+        const createdCancelledAt = createStatus === 'cancelado' ? nowTs : null;
         const stmt = db.prepare(`
-          INSERT INTO clients (name, phone, plan, price, discount, server_id, due_date, status, username, password, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO clients (name, phone, plan, price, discount, server_id, due_date, status, expired_at, cancelled_at, username, password, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const info = stmt.run(
           name.trim(),
@@ -91,7 +95,9 @@ module.exports = (waService) => {
           discount || 0,
           server_id || null,
           due_date,
-          status || 'ativo',
+          createStatus,
+          createdExpiredAt,
+          createdCancelledAt,
           username || null,
           encPassword,
           notes || null
@@ -150,9 +156,23 @@ module.exports = (waService) => {
         ? (password ? encryptText(password.trim()) : null)
         : existing.password;
 
+      const newStatus = status ?? existing.status;
+      const nowTs = db.prepare("SELECT datetime('now', 'localtime') t").get().t;
+      let expiredAt = existing.expired_at || null;
+      let cancelledAt = existing.cancelled_at || null;
+      if (newStatus === 'expirado') {
+        if (existing.status !== 'expirado') expiredAt = nowTs;
+      } else if (newStatus === 'cancelado') {
+        if (existing.status !== 'cancelado') cancelledAt = nowTs;
+      } else {
+        // reativado: limpa timestamps de baixa
+        if (existing.status === 'expirado') expiredAt = null;
+        if (existing.status === 'cancelado') cancelledAt = null;
+      }
+
       db.prepare(`
         UPDATE clients SET name = ?, phone = ?, plan = ?, price = ?, discount = ?, server_id = ?,
-          due_date = ?, status = ?, username = ?, password = ?, notes = ? WHERE id = ?
+          due_date = ?, status = ?, username = ?, password = ?, notes = ?, expired_at = ?, cancelled_at = ? WHERE id = ?
       `).run(
         name ?? existing.name,
         phone ?? existing.phone,
@@ -161,10 +181,12 @@ module.exports = (waService) => {
         discount ?? existing.discount,
         server_id ?? existing.server_id,
         due_date ?? existing.due_date,
-        status ?? existing.status,
+        newStatus,
         username ?? existing.username,
         encPassword,
         notes ?? existing.notes,
+        expiredAt,
+        cancelledAt,
         req.params.id
       );
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
@@ -205,7 +227,7 @@ module.exports = (waService) => {
 
       // Transação Atômica ACID
       const renewTransaction = db.transaction(() => {
-        db.prepare("UPDATE clients SET due_date = ?, status = 'ativo' WHERE id = ?").run(newDue, client.id);
+        db.prepare("UPDATE clients SET due_date = ?, status = 'ativo', expired_at = NULL, cancelled_at = NULL WHERE id = ?").run(newDue, client.id);
         if (renewValue > 0) {
           db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'renovacao', ?, ?)")
             .run(client.id, renewValue, renewal_date);

@@ -5,15 +5,15 @@ const {
   getActiveClientsCount,
   getActiveServersCount,
   getMonthlyRecurringRevenue,
-  getMonthlyServerCost,
   getAllActiveClients,
-  getCancelledLast30Days,
+  getChurnLast30Days,
   getExpiredClients,
   getExpiredCount,
   getExpiredRevenue,
   getServerRanking,
   getPlanDistribution,
   getMonthSalesTotals,
+  getMonthlyServerCostByMonth,
   getMonthlyProfitHistory
 } = require('../db/queries/dashboard');
 
@@ -40,8 +40,13 @@ router.get('/', (req, res) => {
   const monthStartStr = `${selectedMonth}-01`;
   const isCurrentMonth = selectedMonth === currentMonthStr();
 
-  const monthlyServerCost = getMonthlyServerCost();
+  const monthlyServerCost = getMonthlyServerCostByMonth(selectedMonth);
   const salesTotals = getMonthSalesTotals(selectedMonth);
+
+  // Mês vigente em andamento (dados ainda parciais)
+  const now = new Date();
+  const lastDayOfCurrent = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const partialMonth = isCurrentMonth && now.getDate() < lastDayOfCurrent;
 
   // ===== ESTADO ATUAL (independente do mês selecionado) =====
   const totalActive = getActiveClientsCount();
@@ -52,7 +57,7 @@ router.get('/', (req, res) => {
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cancelledLast30 = getCancelledLast30Days(thirtyDaysAgo.toISOString().slice(0, 10));
+  const cancelledLast30 = getChurnLast30Days(thirtyDaysAgo.toISOString().slice(0, 10));
   const activeAtStart = totalActive + cancelledLast30;
   const churnRate = activeAtStart > 0 ? ((cancelledLast30 / activeAtStart) * 100).toFixed(1) : '0.0';
 
@@ -109,6 +114,7 @@ router.get('/', (req, res) => {
   res.json({
     selectedMonth,
     isCurrentMonth,
+    partialMonth,
     // Estado atual
     totalActive,
     totalServers: getActiveServersCount(),

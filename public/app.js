@@ -231,7 +231,7 @@ async function loadDashboard(){
     
     animateValue(activeEl, 0, d.totalActive);
     animateValue(expiringEl, 0, d.expiringSoonCount);
-    animateValue(overdueEl, 0, d.expiredCount);
+    animateValue(overdueEl, 0, d.overdueCount);
 
     // Vencimentos por período
     const periodEl = document.getElementById('projection-period-list');
@@ -713,19 +713,21 @@ async function loadFinanceiro(){
     const isCur = dash.isCurrentMonth;
 
     // KPIs Principais — dados REALIZADOS do mês selecionado
-    document.getElementById('fin-revenue-label').textContent = isCur ? 'Receita do Mês' : 'Receita do mês';
-    document.getElementById('fin-active-label').textContent = isCur ? 'Assinaturas Ativas' : 'Clientes Ativos no Mês';
+    document.getElementById('fin-revenue-label').textContent = 'Receita do mês';
+    const mrrSub = document.getElementById('fin-mrr-sub');
+    if (mrrSub) mrrSub.textContent = isCur ? 'MRR recorrente: ' + money(dash.mrr) : '';
+    document.getElementById('fin-active-label').textContent = isCur ? 'Assinaturas Ativas' : 'Clientes ativos no mês';
     animateMoneyValue(document.getElementById('fin-mrr'), dash.monthlyRevenue);
     animateMoneyValue(document.getElementById('fin-net-profit'), dash.netProfit);
-    document.getElementById('fin-margin').textContent = dash.profitMargin + '% margem';
-    animateValue(document.getElementById('fin-active'), 0, dash.totalActive);
+    document.getElementById('fin-margin').textContent = dash.profitMargin + '% margem' + (isCur && dash.partialMonth ? ' · mês em andamento' : '');
+    animateValue(document.getElementById('fin-active'), 0, isCur ? dash.totalActive : (dash.totalClientsMonth ?? 0));
     animateMoneyValue(document.getElementById('fin-ticket'), dash.avgTicket);
 
     // Metricas de Assinatura
     document.getElementById('fin-new').textContent = dash.newClientsMonth;
     const renewalsPill = document.getElementById('fin-renewals');
     renewalsPill.textContent = `${dash.renewalsCount} · ${money(dash.renewalsRevenue)}`;
-    renewalsPill.title = `${dash.renewalsCount} renovacoes neste mes — Lucro: ${money(dash.renewalsRevenue)}`;
+    renewalsPill.title = `${dash.renewalsCount} renovações neste mês — Receita: ${money(dash.renewalsRevenue)}`;
     document.getElementById('fin-renewals-revenue').textContent = money(dash.renewalsRevenue);
     document.getElementById('fin-churn').textContent = isCur ? dash.churnRate + '%' : '—';
     document.getElementById('fin-server-cost').textContent = money(dash.monthlyServerCost);
@@ -743,19 +745,22 @@ async function loadFinanceiro(){
     if (history && history.length){
       const maxAbs = Math.max(1, ...history.map(h => Math.abs(h.netProfit)));
       const maxH = 170;
+      const curMonth = new Date().toISOString().slice(0, 7);
       let html = '';
       for(const h of history){
         const isSel = h.month === dash.selectedMonth;
         const isNeg = h.netProfit < 0;
+        const isPartial = dash.partialMonth && h.month === curMonth;
         const barH = Math.max((Math.abs(h.netProfit) / maxAbs) * maxH, 4);
+        const tip = `${money(h.totalSales)} receita · ${money(h.serverCost)} custo${isPartial ? ' · mês em andamento (parcial)' : ''}`;
         html += `
-          <div class="proj-bar-group${isSel ? ' selected' : ''}">
-            <div class="proj-bar-value">${money(h.netProfit)}</div>
-            <div class="proj-bar-stack ${isNeg ? 'negative' : ''}" style="height:${barH}px">
+          <div class="proj-bar-group${isSel ? ' selected' : ''}${isPartial ? ' partial' : ''}">
+            <div class="proj-bar-value" title="${tip}">${money(h.netProfit)}${isPartial ? ' *' : ''}</div>
+            <div class="proj-bar-stack ${isNeg ? 'negative' : ''}" style="height:${barH}px" title="${tip}">
               <div class="proj-bar-${isNeg ? 'risk' : 'safe'}" style="height:100%"></div>
             </div>
-            <div class="proj-bar-label">${fmtMonthLabel(h.month)}</div>
-            <div class="proj-bar-sub">${h.countRenewals} renov. · ${money(h.totalSales)}</div>
+            <div class="proj-bar-label" title="${tip}">${fmtMonthLabel(h.month)}${isPartial ? ' · parcial' : ''}</div>
+            <div class="proj-bar-sub" title="${tip}">${h.countRenewals} renov. · ${money(h.totalSales)}</div>
           </div>`;
       }
       container.innerHTML = html;

@@ -26,6 +26,29 @@ function runMigrations() {
     db.exec("ALTER TABLE clients ADD COLUMN password TEXT");
     console.log('[db] Migração: adicionada coluna password em clients');
   }
+  if (!clientColumns.some(c => c.name === 'expired_at')) {
+    db.exec("ALTER TABLE clients ADD COLUMN expired_at TEXT");
+    console.log('[db] Migração: adicionada coluna expired_at em clients');
+  }
+  if (!clientColumns.some(c => c.name === 'cancelled_at')) {
+    db.exec("ALTER TABLE clients ADD COLUMN cancelled_at TEXT");
+    console.log('[db] Migração: adicionada coluna cancelled_at em clients');
+  }
+
+  // Backfill idempotente: preenche timestamps de transição para linhas pré-existentes
+  // (aproximação documentada: usa due_date como data da baixa).
+  const backfillExpired = db.prepare(
+    "UPDATE clients SET expired_at = due_date WHERE status = 'expirado' AND expired_at IS NULL"
+  ).run();
+  if (backfillExpired.changes > 0) {
+    console.log(`[db] Backfill: ${backfillExpired.changes} cliente(s) expirado(s) com expired_at = due_date`);
+  }
+  const backfillCancelled = db.prepare(
+    "UPDATE clients SET cancelled_at = due_date WHERE status = 'cancelado' AND cancelled_at IS NULL"
+  ).run();
+  if (backfillCancelled.changes > 0) {
+    console.log(`[db] Backfill: ${backfillCancelled.changes} cliente(s) cancelado(s) com cancelled_at = due_date`);
+  }
 
   const planColumns2 = db.prepare("PRAGMA table_info(plans)").all();
   if (!planColumns2.some(c => c.name === 'screens')) {

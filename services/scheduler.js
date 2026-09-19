@@ -85,9 +85,10 @@ function restartScheduler(waService, io) {
 
 function expireOverdueClients() {
   const today = formatDate(new Date());
+  const nowTs = db.prepare("SELECT datetime('now', 'localtime') t").get().t;
   const result = db.prepare(
-    "UPDATE clients SET status = 'expirado' WHERE status = 'ativo' AND due_date < ?"
-  ).run(today);
+    "UPDATE clients SET status = 'expirado', expired_at = ? WHERE status = 'ativo' AND due_date < ?"
+  ).run(nowTs, today);
   if (result.changes > 0) {
     console.log(`[scheduler] ${result.changes} cliente(s) expirado(s) automaticamente.`);
   }

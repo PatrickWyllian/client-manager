@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS clients (
   server_id INTEGER,
   due_date TEXT NOT NULL, -- YYYY-MM-DD
   status TEXT NOT NULL DEFAULT 'ativo', -- ativo | expirado | cancelado
+  expired_at TEXT, -- quando transitou de ativo -> expirado
+  cancelled_at TEXT, -- quando transitou de ativo -> cancelado
   username TEXT,
   password TEXT,
   notes TEXT,
