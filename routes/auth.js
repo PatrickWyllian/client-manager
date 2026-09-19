@@ -24,7 +24,7 @@ router.post('/login', (req, res) => {
 
   res.cookie('token', token, {
     httpOnly: true,
-    secure: false, // Set true in production with HTTPS
+    secure: true, // HTTPS via Traefik
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24h
   });
@@ -33,7 +33,7 @@ router.post('/login', (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+  res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'lax' });
   res.json({ ok: true });
 });
 

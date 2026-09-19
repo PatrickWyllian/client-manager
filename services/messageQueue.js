@@ -1,6 +1,7 @@
 const db = require('../db/database');
 const { EventEmitter } = require('events');
 const { normalizePhone } = require('../lib/validators');
+const { recordNotification } = require('./scheduler');
 
 /**
  * Spintax parser: replaces {option1|option2|option3} with a random choice
@@ -89,6 +90,13 @@ class MessageQueue extends EventEmitter {
       db.prepare(
         "UPDATE message_queue SET status = 'sent', sent_at = datetime('now', 'localtime') WHERE id = ?"
       ).run(pending.id);
+
+      // Registra a notificação somente após o envio CONFIRMADO,
+      // para que a cron não re-envie (e sem dar falso "enviada" antes da hora).
+      if (pending.client_id) {
+        const client = db.prepare("SELECT due_date FROM clients WHERE id = ?").get(pending.client_id);
+        if (client) recordNotification(pending.client_id, client.due_date, pending.type);
+      }
 
       this.emit('queue:sent', pending);
 

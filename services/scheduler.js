@@ -39,6 +39,14 @@ function startScheduledJobs(waService, io) {
 
   const schedules = getSchedulesFromDB();
 
+  // Expiração diária de clientes vencidos — independente do reminder,
+  // para que post-expiry/recuperação e métricas não dependam de um job opcional.
+  const expireExpr = `5 0 * * *`;
+  scheduledJobs.expire = cron.schedule(expireExpr, () => {
+    expireOverdueClients();
+  });
+  console.log('[scheduler] Expiração automática agendada para 00:05.');
+
   if (schedules.reminder.enabled) {
     const cronExpr = `${schedules.reminder.minute} ${schedules.reminder.hour} * * *`;
     scheduledJobs.reminder = cron.schedule(cronExpr, () => {
@@ -84,6 +92,19 @@ function expireOverdueClients() {
     console.log(`[scheduler] ${result.changes} cliente(s) expirado(s) automaticamente.`);
   }
   return result.changes;
+}
+
+// Registra a notificação somente após o envio REAL (chamado pela fila).
+// A verificação duplica o filtro de "alreadySent" dos jobs para evitar duplicatas.
+function recordNotification(clientId, dueDate, type) {
+  if (!clientId || !type) return;
+  const exists = db.prepare(
+    'SELECT 1 FROM notifications_log WHERE client_id = ? AND due_date = ? AND type = ?'
+  ).get(clientId, dueDate, type);
+  if (exists) return;
+  db.prepare(
+    'INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, ?)'
+  ).run(clientId, dueDate, type);
 }
 
 // --- Mensagem de lembrete (antes do vencimento) ---
@@ -174,17 +195,16 @@ async function sendWelcomeMessage(waService, client) {
     const message = buildWelcomeMessage(client);
 
     if (messageQueue) {
+      // O registro em notifications_log ocorre após o envio REAL (na fila).
       messageQueue.enqueue(client.phone, message, 'welcome', client.id, 2);
     } else if (waService.getStatus().status === 'connected') {
       await waService.sendMessage(client.phone, message);
+      recordNotification(client.id, client.due_date, 'welcome');
     } else {
       console.log(`[scheduler] WhatsApp desconectado — boas-vindas para ${client.name} enfileirada`);
       return false;
     }
 
-    db.prepare(
-      "INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, 'welcome')"
-    ).run(client.id, client.due_date);
     return true;
   } catch (err) {
     console.error(`[scheduler] Falha ao enviar boas-vindas para ${client.name}:`, err.message);
@@ -218,13 +238,12 @@ async function runReminderCheck(waService, io) {
 
     try {
       if (messageQueue) {
+        // O registro em notifications_log ocorre após o envio REAL (na fila).
         messageQueue.enqueue(client.phone, message, 'reminder', client.id, 1);
       } else if (waService.getStatus().status === 'connected') {
         await waService.sendMessage(client.phone, message);
+        recordNotification(client.id, client.due_date, 'reminder');
       }
-      db.prepare(
-        "INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, 'reminder')"
-      ).run(client.id, client.due_date);
       queuedCount++;
       // Log de dedução — o toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
@@ -274,13 +293,12 @@ async function runRecoveryCheck(waService, io) {
 
     try {
       if (messageQueue) {
+        // O registro em notifications_log ocorre após o envio REAL (na fila).
         messageQueue.enqueue(client.phone, message, 'recovery', client.id, 1);
       } else if (waService.getStatus().status === 'connected') {
         await waService.sendMessage(client.phone, message);
+        recordNotification(client.id, client.due_date, 'recovery');
       }
-      db.prepare(
-        "INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, 'recovery')"
-      ).run(client.id, client.due_date);
       queuedCount++;
       console.log(`[scheduler] Recuperação enfileirada para ${client.name} (${queuedCount}/${toSend.length})`);
       // Toast "enviada" agora é emitido pela fila (wa:message-sent)
@@ -327,13 +345,12 @@ async function runPostExpiryCheck(waService, io) {
 
     try {
       if (messageQueue) {
+        // O registro em notifications_log ocorre após o envio REAL (na fila).
         messageQueue.enqueue(client.phone, message, 'post_expiry', client.id, 1);
       } else if (waService.getStatus().status === 'connected') {
         await waService.sendMessage(client.phone, message);
+        recordNotification(client.id, client.due_date, 'post_expiry');
       }
-      db.prepare(
-        "INSERT INTO notifications_log (client_id, due_date, type) VALUES (?, ?, 'post_expiry')"
-      ).run(client.id, client.due_date);
       queuedCount++;
       console.log(`[scheduler] Pós-vencimento enfileirado para ${client.name} (${queuedCount}/${candidates.length})`);
       // Toast "enviada" agora é emitido pela fila (wa:message-sent)
@@ -360,6 +377,7 @@ module.exports = {
   runRecoveryCheck,
   runPostExpiryCheck,
   sendWelcomeMessage,
+  recordNotification,
   buildWelcomeMessage,
   buildRecoveryMessage,
   buildRenewalMessage,

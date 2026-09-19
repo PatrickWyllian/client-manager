@@ -13,7 +13,6 @@ function runSeed() {
     'Olá {nome}! Sua renovação foi confirmada com sucesso!\n\nSeu acesso foi estendido:\n\n📺 Plano: {plano}\n🖥️ Servidor: {servidor}\n📅 Novo vencimento: {novo_vencimento}\n👤 Usuário: {usuario}\n\nObrigado pela preferência! Qualquer dúvida, estou à disposição!');
   upsertSetting.run('recovery_days_after_expiry', '15');
   upsertSetting.run('recovery_batch_size', '5');
-  upsertSetting.run('recovery_interval_minutes', '5');
   upsertSetting.run('post_expiry_days', '3');
   upsertSetting.run('reminder_schedule_hour', '10');
   upsertSetting.run('reminder_schedule_minute', '0');

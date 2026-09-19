@@ -14,7 +14,17 @@ const WhatsAppService = require('./services/whatsapp');
 const MessageQueue = require('./services/messageQueue');
 const { startScheduler, restartScheduler, runReminderCheck } = require('./services/scheduler');
 const { startAutoBackup } = require('./services/backup');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware, JWT_SECRET } = require('./middleware/auth');
+const jwt = require('jsonwebtoken');
+
+// Handlers globais para erros assíncronos do Baileys/WhatsApp.
+// Sem eles, uma única rejeição não tratada derruba o processo inteiro.
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] unhandledRejection:', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[process] uncaughtException:', err && err.stack ? err.stack : err);
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +40,26 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3400;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || `http://localhost:${PORT}`;
+
+// Autenticação do Socket.IO: exige o mesmo JWT usado na API (via cookie ou handshake.auth.token).
+io.use((socket, next) => {
+  const handshake = socket.handshake;
+  const cookieHeader = handshake && handshake.headers ? handshake.headers.cookie : '';
+  const cookieToken = cookieHeader
+    ? cookieHeader.match(/(?:^|;\s*)token=([^;]+)/)
+    : null;
+  const token = (handshake.auth && handshake.auth.token) ||
+    (cookieToken ? decodeURIComponent(cookieToken[1]) : null);
+
+  if (!token) return next(new Error('not authenticated'));
+
+  try {
+    jwt.verify(token, JWT_SECRET);
+    return next();
+  } catch {
+    return next(new Error('not authenticated'));
+  }
+});
 
 // Security middleware
 app.use(helmet({
@@ -136,4 +166,6 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   startScheduler(waService, io, messageQueue);
   startAutoBackup();
   messageQueue.start();
+  // Reconecta o WhatsApp automaticamente após qualquer reinício do app/container.
+  waService.connect().catch(err => console.error('[whatsapp] Falha ao conectar no startup:', err.message));
 });
