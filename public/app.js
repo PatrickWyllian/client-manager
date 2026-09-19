@@ -1126,6 +1126,15 @@ async function loadResellerReport() {
       api('/resellers/report/history')
     ]);
 
+    const isCur = month === brMonthKey(new Date());
+    const scopeLabel = document.getElementById('rev-scope-label');
+    scopeLabel.textContent = fmtRevMonthLabel(month);
+    scopeLabel.classList.toggle('partial', isCur);
+    if (isCur) scopeLabel.title = 'Mês em andamento — dados parciais';
+    document.getElementById('purchases-month-label').textContent = fmtRevMonthLabel(month);
+    document.getElementById('rev-breakdown-sub').textContent =
+      `${summary.kpis.total_resellers_active} revendedor(es) com compras no mês`;
+
     renderResellerMonthlyKPIs(summary.kpis);
     renderResellerHistoryChart(history, month);
     renderResellerBreakdown(summary.byReseller, month);
@@ -1133,13 +1142,32 @@ async function loadResellerReport() {
 }
 
 function renderResellerMonthlyKPIs(kpis) {
-  animateValue(document.getElementById('rev-month-purchases'), 0, kpis.total_purchases);
-  animateValue(document.getElementById('rev-month-credits'), 0, kpis.total_credits);
-  animateMoneyValue(document.getElementById('rev-month-revenue'), kpis.total_revenue);
-  animateMoneyValue(document.getElementById('rev-month-cost'), kpis.total_cost);
+  document.getElementById('rev-month-purchases').textContent = kpis.total_purchases;
+  document.getElementById('rev-month-credits').textContent = kpis.total_credits;
+  document.getElementById('rev-month-purchases-sub').textContent =
+    kpis.total_resellers_active > 0 ? `${kpis.total_resellers_active} revendedores ativos` : 'nenhum revendedor com compra';
+  document.getElementById('rev-month-credits-sub').textContent =
+    kpis.total_purchases > 0 ? `${(kpis.total_credits / kpis.total_purchases).toFixed(1)} créd. por compra` : '';
+
+  const revenueEl = document.getElementById('rev-month-revenue');
+  revenueEl.textContent = money(kpis.total_revenue);
+  document.getElementById('rev-month-revenue-sub').textContent =
+    kpis.total_credits > 0 ? `preço médio ${money(kpis.avg_credit_price)}/crédito` : '';
+
+  const costEl = document.getElementById('rev-month-cost');
+  costEl.textContent = money(kpis.total_cost);
+  document.getElementById('rev-month-cost-sub').textContent =
+    kpis.total_credits > 0 ? `custo médio ${money(kpis.avg_credit_cost)}/crédito` : '';
+
   const profitEl = document.getElementById('rev-month-profit');
-  animateMoneyValue(profitEl, kpis.net_profit);
-  profitEl.style.color = kpis.net_profit >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)';
+  profitEl.textContent = money(kpis.net_profit);
+  setProfitClass(profitEl, kpis.net_profit);
+  document.getElementById('rev-month-profit-sub').textContent = `margem ${kpis.margin_pct}%`;
+}
+
+function setProfitClass(el, value) {
+  el.classList.remove('value-pos', 'value-neg');
+  el.classList.add(value >= 0 ? 'value-pos' : 'value-neg');
 }
 
 function renderResellerHistoryChart(history, selectedMonth) {
@@ -1151,23 +1179,26 @@ function renderResellerHistoryChart(history, selectedMonth) {
 
   const maxVal = Math.max(1, ...history.map(h => Math.max(h.total_revenue, h.total_cost)));
   const maxH = 170;
+  const curMonth = brMonthKey(new Date());
   let html = '';
 
   for (const h of history) {
     const isSel = h.month === selectedMonth;
+    const isPartial = h.month === curMonth;
     const revenueH = Math.max((h.total_revenue / maxVal) * maxH, 2);
     const costH = Math.max((h.total_cost / maxVal) * maxH, 2);
+    const tip = `${money(h.total_revenue)} receita · ${money(h.total_cost)} custo · ${money(h.net_profit)} lucro · margem ${h.margin_pct}%`;
     html += `
-      <div class="proj-bar-group${isSel ? ' selected' : ''}">
-        <div class="proj-bar-value">${money(h.total_revenue)}</div>
-        <div class="proj-bar-stack" style="height:${revenueH}px">
+      <div class="proj-bar-group${isSel ? ' selected' : ''}${isPartial ? ' partial' : ''}">
+        <div class="proj-bar-value" title="${tip}">${money(h.total_revenue)}</div>
+        <div class="proj-bar-stack" style="height:${revenueH}px" title="${tip}">
           <div class="proj-bar-safe" style="height:100%"></div>
         </div>
-        <div class="proj-bar-stack" style="height:${costH}px;margin-top:2px">
+        <div class="proj-bar-stack" style="height:${costH}px;margin-top:2px" title="${tip}">
           <div class="proj-bar-risk" style="height:100%"></div>
         </div>
-        <div class="proj-bar-label">${fmtRevMonthLabel(h.month)}</div>
-        <div class="proj-bar-sub">${h.purchase_count} compra${h.purchase_count !== 1 ? 's' : ''} · ${h.total_credits} créd.</div>
+        <div class="proj-bar-label" title="${tip}">${fmtRevMonthLabel(h.month)}${isPartial ? ' · parcial' : ''}</div>
+        <div class="proj-bar-sub" title="${tip}">${h.purchase_count} compra${h.purchase_count !== 1 ? 's' : ''} · ${h.total_credits} créd. · margem ${h.margin_pct}%</div>
       </div>`;
   }
 
@@ -1190,9 +1221,9 @@ function renderResellerBreakdown(byReseller, month) {
       <td><span class="status-badge ${r.status === 'ativo' ? 'badge-active' : 'badge-inactive'}">${r.status}</span></td>
       <td>${r.purchases || 0}</td>
       <td>${r.credits || 0}</td>
-      <td>R$ ${(r.revenue || 0).toFixed(2)}</td>
-      <td>R$ ${(r.cost || 0).toFixed(2)}</td>
-      <td class="${profitClass}">R$ ${(r.net_profit || 0).toFixed(2)}</td>
+      <td>${money(r.revenue || 0)}</td>
+      <td>${money(r.cost || 0)}</td>
+      <td class="${profitClass}" title="Margem ${r.margin_pct || '0.0'}%">${money(r.net_profit || 0)}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="8" class="empty-msg">Nenhum revendedor com compras neste mês.</td></tr>';
 
@@ -1206,10 +1237,10 @@ function renderResellerKPIs(list) {
   const totalProfit = list.reduce((s, r) => s + (r.net_profit || 0), 0);
   document.getElementById('rev-active-count').textContent = active.length;
   document.getElementById('rev-total-credits').textContent = totalCredits;
-  document.getElementById('rev-total-revenue').textContent = 'R$ ' + totalRevenue.toFixed(2);
+  document.getElementById('rev-total-revenue').textContent = money(totalRevenue);
   const profitEl = document.getElementById('rev-total-profit');
-  profitEl.textContent = 'R$ ' + totalProfit.toFixed(2);
-  profitEl.style.color = totalProfit >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)';
+  profitEl.textContent = money(totalProfit);
+  setProfitClass(profitEl, totalProfit);
 }
 
 function renderResellers(list) {
@@ -1223,14 +1254,15 @@ function renderResellers(list) {
       <td><span class="status-badge ${r.status === 'ativo' ? 'badge-active' : 'badge-inactive'}">${escapeHtml(r.status)}</span></td>
       <td>${r.total_purchases || 0}</td>
       <td>${r.total_credits || 0}</td>
-      <td>R$ ${(r.total_revenue || 0).toFixed(2)}</td>
-      <td class="${profitClass}">R$ ${(r.net_profit || 0).toFixed(2)}</td>
+      <td>${money(r.total_revenue || 0)}</td>
+      <td class="${profitClass}">${money(r.net_profit || 0)}</td>
+      <td>${r.last_purchase_date ? formatDate(r.last_purchase_date) : '—'}</td>
       <td>
         <button class="btn-icon" onclick="editReseller(${r.id})" title="Editar" aria-label="Editar">${ICONS.edit}</button>
         <button class="btn-icon btn-icon-danger" onclick="deleteReseller(${r.id})" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>
       </td>
     </tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty-msg">Nenhum revendedor cadastrado.</td></tr>';
+  }).join('') : '<tr><td colspan="10" class="empty-msg">Nenhum revendedor cadastrado.</td></tr>';
 }
 
 async function loadPurchases() {
@@ -1252,9 +1284,9 @@ function renderPurchases(list) {
       <td>${escapeHtml(p.reseller_name || '—')}</td>
       <td>${escapeHtml(p.server_name || '—')}</td>
       <td>${p.credits_qty}</td>
-      <td>R$ ${(p.amount_paid || 0).toFixed(2)}</td>
-      <td>R$ ${(p.cost_per_credit || 0).toFixed(2)}</td>
-      <td class="${profitClass}">R$ ${profit.toFixed(2)}</td>
+      <td>${money(p.amount_paid || 0)}</td>
+      <td>${money(p.cost_per_credit || 0)}</td>
+      <td class="${profitClass}">${money(profit)}</td>
       <td>
         <button class="btn-icon" onclick="editPurchase(${p.id})" title="Editar" aria-label="Editar">${ICONS.edit}</button>
         <button class="btn-icon btn-icon-danger" onclick="deletePurchase(${p.id})" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>

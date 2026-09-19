@@ -531,6 +531,46 @@ body::before {
   margin-top: 2px;
 }
 
+/* ── REVENDEDORES ─────────────────────────────────────────────── */
+.month-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.month-filter input[type="month"] {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 9px 14px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  transition: all var(--duration) var(--ease-out);
+}
+
+.month-filter input[type="month"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.section-note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+#rev-scope-label.partial {
+  border-bottom: 1px dashed var(--warning, #f5b32f);
+  opacity: 0.95;
+}
+
+.value-pos { color: var(--success, #10b981); }
+.value-neg { color: var(--danger, #ef4444); }
+
 /* ── METRIC PILLS ──────────────────────────────────────────────── */
 .metric-row {
   display: flex;

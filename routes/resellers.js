@@ -22,7 +22,8 @@ router.get('/', (req, res) => {
       (SELECT COUNT(*) FROM reseller_credit_purchases p WHERE p.reseller_id = r.id) AS total_purchases,
       (SELECT COALESCE(SUM(p.credits_qty), 0) FROM reseller_credit_purchases p WHERE p.reseller_id = r.id) AS total_credits,
       (SELECT COALESCE(SUM(p.amount_paid), 0) FROM reseller_credit_purchases p WHERE p.reseller_id = r.id) AS total_revenue,
-      (SELECT COALESCE(SUM(p.cost_per_credit * p.credits_qty), 0) FROM reseller_credit_purchases p WHERE p.reseller_id = r.id) AS total_cost
+      (SELECT COALESCE(SUM(p.cost_per_credit * p.credits_qty), 0) FROM reseller_credit_purchases p WHERE p.reseller_id = r.id) AS total_cost,
+      (SELECT MAX(p.purchase_date) FROM reseller_credit_purchases p WHERE p.reseller_id = r.id) AS last_purchase_date
     FROM resellers r
     ORDER BY r.name COLLATE NOCASE
   `).all();
@@ -237,7 +238,8 @@ router.get('/report/history', (req, res) => {
 
   const result = rows.map(r => ({
     ...r,
-    net_profit: r.total_revenue - r.total_cost
+    net_profit: r.total_revenue - r.total_cost,
+    margin_pct: r.total_revenue > 0 ? ((r.total_revenue - r.total_cost) / r.total_revenue * 100).toFixed(1) : '0.0'
   }));
 
   res.json(result);
@@ -258,7 +260,17 @@ router.get('/report/summary', (req, res) => {
     WHERE strftime('%Y-%m', purchase_date) = ?
   `).get(month);
 
+  const resellersActive = db.prepare(`
+    SELECT COUNT(DISTINCT reseller_id) AS qty
+    FROM reseller_credit_purchases
+    WHERE strftime('%Y-%m', purchase_date) = ?
+  `).get(month).qty;
+
+  kpis.total_resellers_active = resellersActive;
   kpis.net_profit = kpis.total_revenue - kpis.total_cost;
+  kpis.margin_pct = kpis.total_revenue > 0 ? ((kpis.net_profit / kpis.total_revenue) * 100).toFixed(1) : '0.0';
+  kpis.avg_credit_price = kpis.total_credits > 0 ? kpis.total_revenue / kpis.total_credits : 0;
+  kpis.avg_credit_cost = kpis.total_credits > 0 ? kpis.total_cost / kpis.total_credits : 0;
 
   // Por revendedor
   const byReseller = db.prepare(`
@@ -277,7 +289,8 @@ router.get('/report/summary', (req, res) => {
 
   const byResellerFull = byReseller.map(r => ({
     ...r,
-    net_profit: r.revenue - r.cost
+    net_profit: r.revenue - r.cost,
+    margin_pct: r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100).toFixed(1) : '0.0'
   }));
 
   res.json({ month, kpis, byReseller: byResellerFull });

@@ -340,60 +340,75 @@
         <button class="btn-primary" id="btn-new-reseller">+ Novo revendedor</button>
       </header>
 
-      <!-- Filtro de mês -->
-      <div class="financeiro-filters">
-        <label>Mês:
-          <input type="month" id="revendedores-month">
-        </label>
+      <!-- Visão geral (acumulada — não muda com o mês) -->
+      <div class="card mt-lg">
+        <div class="queue-header">
+          <h2>Visão geral · todo o período</h2>
+          <span class="section-note">Referência acumulada — não muda com o mês selecionado.</span>
+        </div>
+        <div class="stat-grid mt-md">
+          <div class="stat-card accent">
+            <span class="stat-label">Revendedores ativos</span>
+            <span class="stat-value" id="rev-active-count">—</span>
+          </div>
+          <div class="stat-card accent">
+            <span class="stat-label">Créditos vendidos</span>
+            <span class="stat-value" id="rev-total-credits">—</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Receita acumulada</span>
+            <span class="stat-value" id="rev-total-revenue">—</span>
+          </div>
+          <div class="stat-card warn">
+            <span class="stat-label">Lucro acumulado</span>
+            <span class="stat-value value-pos" id="rev-total-profit">—</span>
+          </div>
+        </div>
       </div>
 
-      <!-- KPIs Revendedores (totais gerais) -->
-      <div class="stat-grid">
-        <div class="stat-card accent">
-          <span class="stat-label">Revendedores ativos</span>
-          <span class="stat-value" id="rev-active-count">—</span>
+      <!-- Desempenho do mês selecionado -->
+      <div class="card mt-lg">
+        <div class="queue-header">
+          <h2>Desempenho <span id="rev-scope-label">—</span></h2>
+          <label class="month-filter">Mês:
+            <input type="month" id="revendedores-month">
+          </label>
         </div>
-        <div class="stat-card accent">
-          <span class="stat-label">Créditos vendidos</span>
-          <span class="stat-value" id="rev-total-credits">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Receita total</span>
-          <span class="stat-value" id="rev-total-revenue">—</span>
-        </div>
-        <div class="stat-card warn">
-          <span class="stat-label">Lucro líquido</span>
-          <span class="stat-value" id="rev-total-profit">—</span>
-        </div>
-      </div>
-
-      <!-- KPIs Mensais do mês selecionado -->
-      <div class="stat-grid mt-md">
-        <div class="stat-card accent">
-          <span class="stat-label">Compras no mês</span>
-          <span class="stat-value" id="rev-month-purchases">—</span>
-        </div>
-        <div class="stat-card accent">
-          <span class="stat-label">Créditos no mês</span>
-          <span class="stat-value" id="rev-month-credits">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Receita do mês</span>
-          <span class="stat-value" id="rev-month-revenue">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Custo do mês</span>
-          <span class="stat-value" id="rev-month-cost">—</span>
-        </div>
-        <div class="stat-card warn">
-          <span class="stat-label">Lucro do mês</span>
-          <span class="stat-value" id="rev-month-profit">—</span>
+        <div class="stat-grid mt-md">
+          <div class="stat-card accent">
+            <span class="stat-label">Compras no mês</span>
+            <span class="stat-value" id="rev-month-purchases">—</span>
+            <span class="stat-sub" id="rev-month-purchases-sub"></span>
+          </div>
+          <div class="stat-card accent">
+            <span class="stat-label">Créditos no mês</span>
+            <span class="stat-value" id="rev-month-credits">—</span>
+            <span class="stat-sub" id="rev-month-credits-sub"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Receita do mês</span>
+            <span class="stat-value" id="rev-month-revenue">—</span>
+            <span class="stat-sub" id="rev-month-revenue-sub"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Custo do mês</span>
+            <span class="stat-value" id="rev-month-cost">—</span>
+            <span class="stat-sub" id="rev-month-cost-sub"></span>
+          </div>
+          <div class="stat-card warn">
+            <span class="stat-label">Lucro do mês</span>
+            <span class="stat-value value-pos" id="rev-month-profit">—</span>
+            <span class="stat-sub" id="rev-month-profit-sub"></span>
+          </div>
         </div>
       </div>
 
       <!-- Gráfico histórico mensal -->
       <div class="projection-card mt-lg">
-        <h2>Compras de Créditos — Histórico Mensal</h2>
+        <div class="queue-header">
+          <h2>Compras de Créditos — Histórico Mensal</h2>
+          <span class="section-note">Passe o mouse sobre as barras para ver receita, custo, lucro e margem.</span>
+        </div>
         <div class="projection-chart" id="rev-history-chart"></div>
         <div class="projection-legend">
           <span class="legend-item"><span class="legend-dot safe"></span> Receita</span>
@@ -404,7 +419,10 @@
 
       <!-- Breakdown por revendedor no mês -->
       <div class="card mt-lg">
-        <h2>Detalhamento por revendedor — <span id="rev-breakdown-month-label">mês atual</span></h2>
+        <div class="queue-header">
+          <h2>Detalhamento por revendedor — <span id="rev-breakdown-month-label">mês atual</span></h2>
+          <span class="section-note" id="rev-breakdown-sub"></span>
+        </div>
         <div class="table-wrap mt-md">
           <table class="data-table">
             <thead>
@@ -417,22 +435,28 @@
         </div>
       </div>
 
-      <!-- Lista de revendedores -->
-      <div class="table-wrap mt-lg">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Nome</th><th>Telefone</th><th>Email</th><th>Status</th><th>Compras</th><th>Créditos</th><th>Receita</th><th>Lucro</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="resellers-tbody"></tbody>
-        </table>
+      <!-- Lista de revendedores (totais acumulados) -->
+      <div class="card mt-lg">
+        <div class="queue-header">
+          <h2>Revendedores — totais acumulados</h2>
+          <span class="section-note">Última compra é a mais recente no histórico.</span>
+        </div>
+        <div class="table-wrap mt-md">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nome</th><th>Telefone</th><th>Email</th><th>Status</th><th>Compras</th><th>Créditos</th><th>Receita</th><th>Lucro</th><th>Última compra</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="resellers-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Compras de créditos -->
       <div class="card mt-lg">
         <div class="queue-header">
-          <h2>Compras de créditos</h2>
+          <h2>Compras do mês — <span id="purchases-month-label">—</span></h2>
           <button class="btn-primary" id="btn-new-purchase">+ Nova compra</button>
         </div>
         <div class="table-wrap mt-md">
