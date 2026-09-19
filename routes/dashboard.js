@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { daysUntil } = require('../lib/dateHelpers');
+const { daysUntil, formatDate } = require('../lib/dateHelpers');
 const {
   getActiveClientsCount,
   getActiveServersCount,
@@ -57,7 +57,7 @@ router.get('/', (req, res) => {
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cancelledLast30 = getChurnLast30Days(thirtyDaysAgo.toISOString().slice(0, 10));
+  const cancelledLast30 = getChurnLast30Days(formatDate(thirtyDaysAgo));
   const activeAtStart = totalActive + cancelledLast30;
   const churnRate = activeAtStart > 0 ? ((cancelledLast30 / activeAtStart) * 100).toFixed(1) : '0.0';
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { decryptText } = require('../lib/crypto');
+const { formatDate, formatMonth } = require('../lib/dateHelpers');
 
 function escapeCsvField(val) {
   if (val === null || val === undefined) return '""';
@@ -42,7 +43,7 @@ router.get('/clients', (req, res) => {
     }
 
     const csvContent = '\uFEFF' + rows.join('\r\n'); // BOM UTF-8 for Excel
-    const filename = `relatorio_clientes_${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = `relatorio_clientes_${formatDate(new Date())}.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -56,7 +57,7 @@ router.get('/clients', (req, res) => {
 // Exportar Vendas / Financeiro para CSV
 router.get('/sales', (req, res) => {
   try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const month = req.query.month || formatMonth(new Date());
     const sales = db.prepare(`
       SELECT s.*, c.name AS client_name, c.phone, c.plan
       FROM sales s

@@ -114,6 +114,20 @@ function money(v){
   return (v||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 }
 
+// ---------- DATA/HORA EM BRASÍLIA (America/Sao_Paulo) ----------
+// "Hoje" e "mês atual" sempre no fuso de Brasília, independente do navegador.
+function brDateKey(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  const o = {};
+  parts.forEach(p => { o[p.type] = p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+function brMonthKey(date) {
+  return brDateKey(date).slice(0, 7);
+}
+
 // ---------- MODAIS GLOBAIS (ESC + clique fora) ----------
 function closeTopModal() {
   const active = document.querySelectorAll('.modal-overlay.active');
@@ -500,7 +514,7 @@ let renewClientCache = null;
 window.renewClient = async (id, name) => {
   document.getElementById('renew-client-id').value = id;
   document.getElementById('renew-client-name').textContent = `Cliente: ${name}`;
-  document.getElementById('renew-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('renew-date').value = brDateKey(new Date());
   document.getElementById('renew-hint').textContent = '';
   renewClientCache = null;
   try {
@@ -532,7 +546,11 @@ document.getElementById('renew-date').addEventListener('change', function () {
     ? new Date(currentDue.getTime())
     : new Date(renewal.getTime());
   base.setMonth(base.getMonth() + months);
-  const preview = base.toISOString().slice(0, 10).split('-');
+  const preview = [
+    String(base.getFullYear()).padStart(4, '0'),
+    String(base.getMonth() + 1).padStart(2, '0'),
+    String(base.getDate()).padStart(2, '0')
+  ];
   document.getElementById('renew-hint').textContent =
     `Vencimento previsto: ${preview[2]}/${preview[1]}/${preview[0]} (${months} meses)`;
 });
@@ -699,7 +717,7 @@ document.getElementById('plan-save').addEventListener('click', async ()=>{
 async function loadFinanceiro(){
   try{
     const monthInput = document.getElementById('financeiro-month');
-    const month = monthInput.value || new Date().toISOString().slice(0, 7);
+    const month = monthInput.value || brMonthKey(new Date());
     const [d, dash] = await Promise.all([
       api('/sales?month=' + month),
       api('/dashboard?month=' + month)
@@ -745,7 +763,7 @@ async function loadFinanceiro(){
     if (history && history.length){
       const maxAbs = Math.max(1, ...history.map(h => Math.abs(h.netProfit)));
       const maxH = 170;
-      const curMonth = new Date().toISOString().slice(0, 7);
+      const curMonth = brMonthKey(new Date());
       let html = '';
       for(const h of history){
         const isSel = h.month === dash.selectedMonth;
@@ -825,7 +843,7 @@ window.undoSale = async (id, clientName) => {
 };
 
 document.getElementById('financeiro-month').addEventListener('change', loadFinanceiro);
-document.getElementById('financeiro-month').value = new Date().toISOString().slice(0, 7);
+document.getElementById('financeiro-month').value = brMonthKey(new Date());
 
 // ---------- WHATSAPP ----------
 function renderWaStatus(data){
@@ -963,13 +981,13 @@ function escapeHtml(text) {
 
 function formatTime(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'Z');
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? `${m[4]}:${m[5]}` : '';
 }
 function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
 }
 
 window.cancelQueueItem = async (id) => {
@@ -1101,7 +1119,7 @@ async function loadResellers() {
 async function loadResellerReport() {
   try {
     const monthInput = document.getElementById('revendedores-month');
-    const month = monthInput.value || new Date().toISOString().slice(0, 7);
+    const month = monthInput.value || brMonthKey(new Date());
 
     const [summary, history] = await Promise.all([
       api('/resellers/report/summary?month=' + month),
@@ -1218,7 +1236,7 @@ function renderResellers(list) {
 async function loadPurchases() {
   try {
     const monthInput = document.getElementById('revendedores-month');
-    const month = monthInput.value || new Date().toISOString().slice(0, 7);
+    const month = monthInput.value || brMonthKey(new Date());
     const purchases = await api('/resellers/purchases/all?month=' + month);
     renderPurchases(purchases);
   } catch (err) { toast(err.message, true); }
@@ -1259,7 +1277,7 @@ document.getElementById('revendedores-month').addEventListener('change', () => {
   loadResellerReport();
   loadPurchases();
 });
-document.getElementById('revendedores-month').value = new Date().toISOString().slice(0, 7);
+document.getElementById('revendedores-month').value = brMonthKey(new Date());
 
 // Modal Revendedor
 document.getElementById('btn-new-reseller').addEventListener('click', () => openResellerModal());
@@ -1317,7 +1335,7 @@ function openPurchaseModal(p = {}) {
   document.getElementById('purchase-qty').value = p.credits_qty || 1;
   document.getElementById('purchase-amount').value = p.amount_paid || 0;
   document.getElementById('purchase-cost').value = p.cost_per_credit || 0;
-  document.getElementById('purchase-date').value = p.purchase_date || new Date().toISOString().slice(0, 10);
+  document.getElementById('purchase-date').value = p.purchase_date || brDateKey(new Date());
   document.getElementById('purchase-notes').value = p.notes || '';
   updatePurchaseProfitPreview();
   document.getElementById('purchase-modal').classList.add('active');

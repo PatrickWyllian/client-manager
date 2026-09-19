@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db/database');
+const { formatDate, formatMonth } = require('../lib/dateHelpers');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function notFound(res, msg = 'Não encontrado.') {
@@ -159,7 +160,7 @@ router.post('/purchases', (req, res) => {
     parseInt(credits_qty),
     parseFloat(amount_paid),
     parseFloat(cost_per_credit),
-    purchase_date || new Date().toISOString().slice(0, 10),
+    purchase_date || formatDate(new Date()),
     notes || null
   );
 
@@ -244,7 +245,7 @@ router.get('/report/history', (req, res) => {
 
 // GET /api/resellers/report/summary?month=YYYY-MM
 router.get('/report/summary', (req, res) => {
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  const month = req.query.month || formatMonth(new Date());
 
   // KPIs globais do mês
   const kpis = db.prepare(`
