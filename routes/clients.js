@@ -33,11 +33,15 @@ module.exports = (waService) => {
     }
     query += req.query.status === 'expirado' ? ' ORDER BY c.due_date DESC' : ' ORDER BY c.due_date ASC';
 
-    const clients = db.prepare(query).all(...params).map(c => ({
-      ...c,
-      password: c.password ? decryptText(c.password) : null,
-      days_until_due: daysUntil(c.due_date)
-    }));
+    const clients = db.prepare(query).all(...params).map(c => {
+      const hasPassword = !!c.password;
+      const { password, ...rest } = c;
+      return {
+        ...rest,
+        has_password: hasPassword,
+        days_until_due: daysUntil(c.due_date)
+      };
+    });
 
     res.json(clients);
   });

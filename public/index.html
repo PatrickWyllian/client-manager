@@ -3,17 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#060a13">
 <title>Client Manager · Painel de Controle</title>
 <meta name="description" content="Painel de controle para gerenciamento de clientes, servidores e assinaturas.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23060a13'/%3E%3Crect x='6' y='11' width='3' height='7' rx='1.5' fill='%2300e5ff'/%3E%3Crect x='10.5' y='5' width='3' height='13' rx='1.5' fill='%2300e5ff'/%3E%3Crect x='15' y='8' width='3' height='10' rx='1.5' fill='%23a855f7'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
 <div class="app">
 
-  <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Menu">
+  <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Abrir menu">
     <span></span><span></span><span></span>
   </button>
 
@@ -80,7 +83,7 @@
         <span class="signal-text">verificando sinal…</span>
       </div>
       <button class="btn-logout" id="btn-logout">
-        <svg style="width:14px;height:14px;vertical-align:middle;margin-right:6px;opacity:0.6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sair
       </button>
     </div>
@@ -89,7 +92,6 @@
 
   <main class="content">
 
-    <!-- DASHBOARD -->
     <!-- DASHBOARD -->
     <section class="tab-panel active" id="tab-dashboard">
       <header class="panel-header">
@@ -114,13 +116,13 @@
       </div>
 
       <!-- Vencimentos por período -->
-      <div class="card" style="margin-top:20px">
+      <div class="card mt-lg">
         <h2>Vencimentos por período — Mês atual</h2>
         <div id="projection-period-list" class="projection-period-list"></div>
       </div>
 
       <!-- Clientes vencidos -->
-      <div class="card expired-card" style="margin-top:20px">
+      <div class="card expired-card mt-lg">
         <h2>Clientes vencidos</h2>
         <div class="expired-summary">
           <div class="expired-stat">
@@ -136,11 +138,12 @@
       </div>
 
       <!-- Vencimentos -->
-      <div class="card" style="margin-top:20px">
+      <div class="card mt-lg">
         <h2>Próximos vencimentos</h2>
         <div id="upcoming-list" class="upcoming-list"></div>
       </div>
     </section>
+
     <!-- CLIENTES -->
     <section class="tab-panel" id="tab-clientes">
       <header class="panel-header">
@@ -150,7 +153,7 @@
       </header>
 
       <div class="filters">
-        <input type="text" id="filter-name" placeholder="Buscar por nome..." class="filter-search">
+        <input type="text" id="filter-name" placeholder="Buscar por nome..." class="filter-search" autocomplete="off">
         <select id="filter-server"><option value="">Todos os servidores</option></select>
         <select id="filter-plan"><option value="">Todos os planos</option></select>
         <select id="filter-status">
@@ -166,11 +169,16 @@
           <thead>
             <tr>
               <th>Nome</th><th>Telefone</th><th>Servidor</th><th>Custo Srv.</th><th>Plano</th>
-              <th>Valor</th><th>Desconto</th><th>Líquido</th><th>Vencimento</th><th>Usuário</th><th>Senha</th><th>Status</th><th></th>
+              <th>Valor</th><th>Desconto</th><th>Líquido</th><th>Vencimento</th><th>Usuário</th><th>Acesso</th><th>Status</th><th></th>
             </tr>
           </thead>
           <tbody id="clients-tbody"></tbody>
         </table>
+      </div>
+
+      <div class="table-footer">
+        <span class="table-count" id="clients-count"></span>
+        <div class="pagination" id="clients-pagination"></div>
       </div>
     </section>
 
@@ -210,9 +218,6 @@
       </div>
     </section>
 
-    <!-- WHATSAPP -->
-    <!-- FINANCEIRO -->
-    <!-- FINANCEIRO -->
     <!-- FINANCEIRO -->
     <section class="tab-panel" id="tab-financeiro">
       <header class="panel-header">
@@ -248,7 +253,7 @@
       </div>
 
       <!-- Métricas de Assinatura -->
-      <div class="metric-row" style="margin-top:14px">
+      <div class="metric-row mt-md">
         <div class="metric-pill">
           <span class="metric-pill-label">Novos Cadastros</span>
           <span class="metric-pill-value" id="fin-new">—</span>
@@ -272,7 +277,7 @@
       </div>
 
       <!-- Alertas -->
-      <div class="stat-grid" style="margin-top:14px">
+      <div class="stat-grid mt-md">
         <div class="stat-card warn">
           <span class="stat-label">Vencendo (7 dias)</span>
           <span class="stat-value" id="fin-expiring">—</span>
@@ -288,7 +293,7 @@
       </div>
 
       <!-- Lucro Líquido por Mês (histórico) -->
-      <div class="projection-card" id="fin-projection-section" style="margin-top:20px">
+      <div class="projection-card mt-lg" id="fin-projection-section">
         <h2 id="fin-projection-title">Lucro Líquido por Mês</h2>
         <div class="projection-chart" id="fin-projection-chart"></div>
         <div class="projection-legend">
@@ -299,7 +304,7 @@
       </div>
 
       <!-- Gráficos -->
-      <div class="dash-grid" style="margin-top:20px">
+      <div class="dash-grid mt-lg">
         <div class="card">
           <h2>Servidores</h2>
           <div id="fin-server-chart" class="chart"></div>
@@ -311,7 +316,7 @@
       </div>
 
       <!-- Lista de vendas -->
-      <div class="card" style="margin-top:20px">
+      <div class="card mt-lg">
         <h2>Vendas do mês</h2>
         <div class="table-wrap">
           <table class="data-table">
@@ -362,7 +367,7 @@
       </div>
 
       <!-- KPIs Mensais do mês selecionado -->
-      <div class="stat-grid" style="margin-top:14px">
+      <div class="stat-grid mt-md">
         <div class="stat-card accent">
           <span class="stat-label">Compras no mês</span>
           <span class="stat-value" id="rev-month-purchases">—</span>
@@ -386,7 +391,7 @@
       </div>
 
       <!-- Gráfico histórico mensal -->
-      <div class="projection-card" style="margin-top:20px">
+      <div class="projection-card mt-lg">
         <h2>Compras de Créditos — Histórico Mensal</h2>
         <div class="projection-chart" id="rev-history-chart"></div>
         <div class="projection-legend">
@@ -397,9 +402,9 @@
       </div>
 
       <!-- Breakdown por revendedor no mês -->
-      <div class="card" style="margin-top:20px">
+      <div class="card mt-lg">
         <h2>Detalhamento por revendedor — <span id="rev-breakdown-month-label">mês atual</span></h2>
-        <div class="table-wrap" style="margin-top:12px">
+        <div class="table-wrap mt-md">
           <table class="data-table">
             <thead>
               <tr>
@@ -412,7 +417,7 @@
       </div>
 
       <!-- Lista de revendedores -->
-      <div class="table-wrap" style="margin-top:20px">
+      <div class="table-wrap mt-lg">
         <table class="data-table">
           <thead>
             <tr>
@@ -424,12 +429,12 @@
       </div>
 
       <!-- Compras de créditos -->
-      <div class="card" style="margin-top:20px">
+      <div class="card mt-lg">
         <div class="queue-header">
           <h2>Compras de créditos</h2>
           <button class="btn-primary" id="btn-new-purchase">+ Nova compra</button>
         </div>
-        <div class="table-wrap" style="margin-top:12px">
+        <div class="table-wrap mt-md">
           <table class="data-table">
             <thead>
               <tr>
@@ -472,7 +477,7 @@
             <button class="btn-secondary" id="btn-wa-disconnect" style="display:none">Desconectar</button>
           </div>
 
-          <!-- Lembrete de vencimento -->
+          <!-- Aviso de vencimento -->
           <div class="wa-settings">
             <div class="wa-settings-header">
               <h3>Aviso de vencimento</h3>
@@ -558,14 +563,34 @@
             </label>
             <p class="hint">Variáveis: {nome}, {plano}, {servidor}, {novo_vencimento}, {usuario}</p>
           </div>
-          </div>
 
-          <button class="btn-secondary" id="btn-save-settings" style="margin-top:12px">Salvar todas as configurações</button>
+          <button class="btn-secondary mt-md w-full" id="btn-save-settings">Salvar todas as configurações</button>
+
+          <!-- Teste de envio -->
+          <div class="wa-test">
+            <h3>Testar envio</h3>
+            <div class="wa-test-grid">
+              <label>Telefone (com DDI, ex: 5521999999999):
+                <input type="text" id="wa-test-phone" placeholder="5521999999999" autocomplete="off">
+              </label>
+              <label>Modelo a enviar:
+                <select id="wa-test-template">
+                  <option value="reminder">Aviso de vencimento</option>
+                  <option value="welcome">Boas-vindas</option>
+                  <option value="recovery">Recuperação</option>
+                  <option value="post-expiry">Pós-vencimento</option>
+                  <option value="renewal">Renovação</option>
+                </select>
+              </label>
+              <button class="btn-secondary" id="btn-wa-test">Enviar teste</button>
+            </div>
+            <p class="hint mt-sm">O teste envia o modelo com as variáveis substituídas usando placeholders. Confirme que o WhatsApp está conectado.</p>
+          </div>
         </div>
       </div>
 
       <!-- FILA DE MENSAGENS -->
-      <div class="card" style="margin-top:20px">
+      <div class="card mt-lg">
         <div class="queue-header">
           <h2>Fila de Mensagens</h2>
           <div class="queue-actions">
@@ -604,7 +629,7 @@
           <div class="queue-list" id="queue-pending-list"></div>
         </div>
 
-        <div class="queue-history" style="margin-top:20px">
+        <div class="queue-history mt-lg">
           <h3>Histórico</h3>
           <div class="queue-list" id="queue-history-list"></div>
         </div>
@@ -615,24 +640,24 @@
 </div>
 
 <!-- Modal Cliente -->
-<div class="modal-overlay" id="client-modal">
+<div class="modal-overlay" id="client-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="client-modal-title">Novo cliente</h2>
     <input type="hidden" id="client-id">
-    <label>Nome <input type="text" id="client-name"></label>
-    <label>Telefone (com DDI, ex: 5521999999999) <input type="text" id="client-phone"></label>
+    <label>Nome <input type="text" id="client-name" autocomplete="off"></label>
+    <label>Telefone (com DDI, ex: 5521999999999) <input type="text" id="client-phone" autocomplete="off"></label>
     <label>Servidor
       <select id="client-server"></select>
     </label>
-    <span id="server-cost-display" style="font-size:0.85em;color:var(--accent);margin-top:-8px;margin-bottom:8px;display:block"></span>
+    <span class="cost-hint" id="server-cost-display"></span>
     <label>Plano
       <select id="client-plan"></select>
     </label>
     <label>Valor mensal (R$) <input type="number" step="0.01" id="client-price"></label>
     <label>Desconto mensal (R$) <input type="number" step="0.01" id="client-discount"></label>
     <label>Data de vencimento <input type="date" id="client-due"></label>
-    <label>Usuário do servidor <input type="text" id="client-username" placeholder="Login do servidor"></label>
-    <label>Senha do servidor <input type="text" id="client-password" placeholder="Senha do servidor"></label>
+    <label>Usuário do servidor <input type="text" id="client-username" placeholder="Login do servidor" autocomplete="off"></label>
+    <label>Senha do servidor <input type="text" id="client-password" placeholder="Senha do servidor" autocomplete="off"></label>
     <label>Status
       <select id="client-status">
         <option value="ativo">Ativo</option>
@@ -648,12 +673,12 @@
 </div>
 
 <!-- Modal Servidor -->
-<div class="modal-overlay" id="server-modal">
+<div class="modal-overlay" id="server-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="server-modal-title">Novo servidor</h2>
     <input type="hidden" id="server-id">
-    <label>Nome <input type="text" id="server-name"></label>
-    <label>Fornecedor <input type="text" id="server-provider"></label>
+    <label>Nome <input type="text" id="server-name" autocomplete="off"></label>
+    <label>Fornecedor <input type="text" id="server-provider" autocomplete="off"></label>
     <label>Custo mensal (R$) <input type="number" step="0.01" id="server-cost"></label>
     <label>Status
       <select id="server-status">
@@ -670,11 +695,11 @@
 </div>
 
 <!-- Modal Plano -->
-<div class="modal-overlay" id="plan-modal">
+<div class="modal-overlay" id="plan-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="plan-modal-title">Novo plano</h2>
     <input type="hidden" id="plan-id">
-    <label>Nome <input type="text" id="plan-name"></label>
+    <label>Nome <input type="text" id="plan-name" autocomplete="off"></label>
     <label>Preço (R$) <input type="number" step="0.01" id="plan-price"></label>
     <label>Duração (meses) <input type="number" id="plan-duration" min="1" value="1"></label>
     <label>Telas simultâneas <input type="number" id="plan-screens" min="1" value="1"></label>
@@ -686,13 +711,13 @@
 </div>
 
 <!-- Modal Renovação -->
-<div class="modal-overlay" id="renew-modal">
+<div class="modal-overlay" id="renew-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h2>Renovar cliente</h2>
-    <p id="renew-client-name" style="color:var(--text-muted);font-size:13px;margin:0 0 16px;"></p>
+    <p class="modal-desc" id="renew-client-name"></p>
     <input type="hidden" id="renew-client-id">
     <label>Data da renovação <input type="date" id="renew-date"></label>
-    <p class="hint" id="renew-hint" style="margin-top:-4px;margin-bottom:12px;"></p>
+    <p class="hint mb-md" id="renew-hint"></p>
     <div class="modal-actions">
       <button class="btn-secondary" id="renew-cancel">Cancelar</button>
       <button class="btn-primary" id="renew-confirm">Confirmar renovação</button>
@@ -701,13 +726,13 @@
 </div>
 
 <!-- Modal Revendedor -->
-<div class="modal-overlay" id="reseller-modal">
+<div class="modal-overlay" id="reseller-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="reseller-modal-title">Novo revendedor</h2>
     <input type="hidden" id="reseller-id">
-    <label>Nome <input type="text" id="reseller-name"></label>
-    <label>Telefone (com DDI, ex: 5521999999999) <input type="text" id="reseller-phone"></label>
-    <label>Email <input type="email" id="reseller-email"></label>
+    <label>Nome <input type="text" id="reseller-name" autocomplete="off"></label>
+    <label>Telefone (com DDI, ex: 5521999999999) <input type="text" id="reseller-phone" autocomplete="off"></label>
+    <label>Email <input type="email" id="reseller-email" autocomplete="off"></label>
     <label>Status
       <select id="reseller-status">
         <option value="ativo">Ativo</option>
@@ -723,7 +748,7 @@
 </div>
 
 <!-- Modal Compra de Créditos -->
-<div class="modal-overlay" id="purchase-modal">
+<div class="modal-overlay" id="purchase-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="purchase-modal-title">Nova compra de créditos</h2>
     <input type="hidden" id="purchase-id">
@@ -738,10 +763,22 @@
     <label>Custo por crédito (R$) <input type="number" step="0.01" id="purchase-cost" value="0"></label>
     <label>Data da compra <input type="date" id="purchase-date"></label>
     <label>Observações <textarea id="purchase-notes" rows="2"></textarea></label>
-    <p class="hint" id="purchase-profit-preview" style="color:var(--accent);"></p>
+    <p class="hint profit-preview" id="purchase-profit-preview"></p>
     <div class="modal-actions">
       <button class="btn-secondary" id="purchase-cancel">Cancelar</button>
       <button class="btn-primary" id="purchase-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Diálogo de confirmação -->
+<div class="modal-overlay" id="confirm-modal" role="alertdialog" aria-modal="true">
+  <div class="modal confirm-modal">
+    <h2 id="confirm-title">Confirmar</h2>
+    <p class="modal-desc" id="confirm-message"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="confirm-no">Cancelar</button>
+      <button class="btn-primary danger" id="confirm-yes">Confirmar</button>
     </div>
   </div>
 </div>

@@ -114,6 +114,79 @@ function money(v){
   return (v||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 }
 
+// ---------- MODAIS GLOBAIS (ESC + clique fora) ----------
+function closeTopModal() {
+  const active = document.querySelectorAll('.modal-overlay.active');
+  const modal = active[active.length - 1];
+  if (!modal) return;
+  modal.classList.remove('active');
+  if (typeof modal._resolve === 'function') modal._resolve(false);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeTopModal();
+});
+
+document.addEventListener('click', (e) => {
+  const target = e.target;
+  if (target.classList && target.classList.contains('modal-overlay') && target.classList.contains('active')) {
+    closeTopModal();
+  }
+});
+
+// ---------- CONFIRMAÇÃO ESTILIZADA ----------
+function confirmDialog(message, opts = {}) {
+  const modal = document.getElementById('confirm-modal');
+  const noBtn = document.getElementById('confirm-no');
+  const yesBtn = document.getElementById('confirm-yes');
+  document.getElementById('confirm-title').textContent = opts.title || 'Confirmar ação';
+  document.getElementById('confirm-message').textContent = message;
+  yesBtn.className = 'btn-primary' + (opts.danger === false ? '' : ' danger');
+  modal.classList.add('active');
+  return new Promise(resolve => {
+    modal._resolve = (val) => {
+      modal.classList.remove('active');
+      modal._resolve = null;
+      noBtn.onclick = null;
+      yesBtn.onclick = null;
+      resolve(val);
+    };
+    noBtn.onclick = () => modal._resolve(false);
+    yesBtn.onclick = () => modal._resolve(true);
+  });
+}
+
+// ---------- ÍCONES (SVG inline) ----------
+const ICONS = {
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  renew: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10"/><path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"/></svg>',
+  recovery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>'
+};
+
+// ---------- COPIAR CREDENCIAIS DO CLIENTE ----------
+window.copyCredentials = async (id) => {
+  try {
+    const c = await api('/clients/' + id);
+    const text = `Usuário: ${c.username || '—'}\nSenha: ${c.password || '—'}`;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast('Credenciais copiadas.');
+  } catch (err) { toast(err.message, true); }
+};
+
 // ---------- LOGOUT ----------
 document.getElementById('btn-logout').addEventListener('click', async () => {
   try {
@@ -165,7 +238,7 @@ async function loadDashboard(){
     periodEl.innerHTML = d.projectionByPeriod.map(p => `
       <div class="period-item">
         <div class="period-info">
-          <span class="period-label">${p.label}</span>
+          <span class="period-label">${escapeHtml(p.label)}</span>
           <span class="period-count">${p.clientCount} cliente${p.clientCount !== 1 ? 's' : ''}</span>
         </div>
         <span class="period-value">${money(p.totalValue)}</span>
@@ -181,12 +254,12 @@ async function loadDashboard(){
       return `
         <div class="expired-item">
           <div>
-            <div class="e-name">${c.name}</div>
-            <div class="e-details">${c.server_name || '—'} · ${c.plan || '—'} · venceu ${day}/${m}/${y} · ${c.username || '—'}</div>
+            <div class="e-name">${escapeHtml(c.name)}</div>
+            <div class="e-details">${escapeHtml(c.server_name || '—')} · ${escapeHtml(c.plan || '—')} · venceu ${day}/${m}/${y} · ${escapeHtml(c.username || '—')}</div>
           </div>
           <div class="e-actions">
             <span class="e-days">${c.days_expired}d vencido</span>
-            <button class="btn-recovery" onclick="sendRecovery(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Enviar recuperação</button>
+            <button class="btn-recovery" data-id="${c.id}" data-name="${escapeHtml(c.name)}" onclick="sendRecovery(${c.id}, this.dataset.name)">Enviar recuperação</button>
           </div>
         </div>`;
     }).join('') : '<p class="empty-msg">Nenhum cliente vencido.</p>';
@@ -204,12 +277,12 @@ async function loadDashboard(){
       return `
         <div class="upcoming-item">
           <div>
-            <div class="u-name">${c.name}</div>
-            <div class="u-server">${c.server_name || '—'} · ${c.plan || '—'} · ${money(mrrClient)}/mês</div>
+            <div class="u-name">${escapeHtml(c.name)}</div>
+            <div class="u-server">${escapeHtml(c.server_name || '—')} · ${escapeHtml(c.plan || '—')} · ${money(mrrClient)}/mês</div>
           </div>
           <div class="u-actions">
             <span class="u-days ${cls}">${label}</span>
-            <button class="btn-renew" onclick="renewClient(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Renovar</button>
+            <button class="btn-renew" data-id="${c.id}" data-name="${escapeHtml(c.name)}" onclick="renewClient(${c.id}, this.dataset.name)">Renovar</button>
           </div>
         </div>`;
     }).join('') : '<p class="empty-msg">Nenhum vencimento próximo.</p>';
@@ -226,7 +299,7 @@ async function loadServersCache(){
   serversCache = await api('/servers');
   const filterSel = document.getElementById('filter-server');
   const modalSel = document.getElementById('client-server');
-  const options = serversCache.map(s=>`<option value="${s.id}" data-cost="${s.cost}">${s.name}${s.cost > 0 ? ' - ' + money(s.cost) : ''}</option>`).join('');
+  const options = serversCache.map(s=>`<option value="${s.id}" data-cost="${s.cost}">${escapeHtml(s.name)}${s.cost > 0 ? ' - ' + money(s.cost) : ''}</option>`).join('');
   filterSel.innerHTML = '<option value="">Todos os servidores</option>' + options;
   modalSel.innerHTML = '<option value="">Nenhum</option>' + options;
 }
@@ -241,9 +314,9 @@ async function loadPlansCache(){
   plansCache = await api('/plans');
   const modalSel = document.getElementById('client-plan');
   const filterSel = document.getElementById('filter-plan');
-  const options = plansCache.map(p=>`<option value="${p.name}" data-price="${p.price}">${p.name} - ${money(p.price)}</option>`).join('');
+  const options = plansCache.map(p=>`<option value="${escapeHtml(p.name)}" data-price="${p.price}">${escapeHtml(p.name)} - ${money(p.price)}</option>`).join('');
   modalSel.innerHTML = '<option value="">Nenhum</option>' + options;
-  filterSel.innerHTML = '<option value="">Todos os planos</option>' + plansCache.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  filterSel.innerHTML = '<option value="">Todos os planos</option>' + plansCache.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
 }
 
 document.getElementById('client-plan').addEventListener('change', function(){
@@ -252,7 +325,14 @@ document.getElementById('client-plan').addEventListener('change', function(){
   if(price) document.getElementById('client-price').value = price;
 });
 
+// ---------- LISTAGEM DE CLIENTES (segurança + paginação) ----------
+let clientsAll = [];
+let clientsPage = 1;
+const CLIENTS_PER_PAGE = 50;
+
 async function loadClients(){
+  const tbody = document.getElementById('clients-tbody');
+  tbody.innerHTML = '<tr class="row-loading"><td colspan="13">Carregando clientes…</td></tr>';
   try{
     if(!serversCache.length) await loadServersCache();
     if(!plansCache.length) await loadPlansCache();
@@ -265,44 +345,74 @@ async function loadClients(){
     if(status) params.set('status', status);
     const clientsRaw = await api('/clients?' + params.toString());
     const nameFilter = document.getElementById('filter-name').value.trim().toLowerCase();
-    const clients = nameFilter ? clientsRaw.filter(c => c.name.toLowerCase().includes(nameFilter)) : clientsRaw;
-    const tbody = document.getElementById('clients-tbody');
-    tbody.innerHTML = clients.length ? clients.map(c=>{
-      const [y,m,d] = c.due_date.split('-');
-      const discount = c.discount || 0;
-      const serverCost = c.server_cost || 0;
-      const net = c.price - discount - serverCost;
-      return `
-      <tr>
-        <td>${c.name}</td>
-        <td>${c.phone}</td>
-        <td>${c.server_name || '—'}</td>
-        <td>${c.server_cost > 0 ? money(c.server_cost) : '—'}</td>
-        <td>${c.plan || '—'}</td>
-        <td>${money(c.price)}</td>
-        <td>${discount > 0 ? '-' + money(discount) : '—'}</td>
-        <td>${money(net)}</td>
-        <td>${d}/${m}/${y}</td>
-        <td>${c.username || '—'}</td>
-        <td>${c.password || '—'}</td>
-        <td><span class="badge ${c.status}">${c.status}</span></td>
-        <td class="row-actions">
-          <button onclick="editClient(${c.id})">Editar</button>
-          <button class="btn-renew" onclick="renewClient(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Renovar</button>
-          ${c.status === 'expirado' ? `<button class="btn-recovery" onclick="sendRecovery(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Recuperação</button>` : ''}
-          <button onclick="deleteClient(${c.id})">Excluir</button>
-        </td>
-      </tr>`;
-    }).join('') : '<tr><td colspan="13" class="empty-msg">Nenhum cliente cadastrado.</td></tr>';
-    // Stagger table rows
-    staggerItems(tbody, 'tr', 30);
-  }catch(err){ toast(err.message, true); }
+    clientsAll = nameFilter ? clientsRaw.filter(c => c.name.toLowerCase().includes(nameFilter)) : clientsRaw;
+    renderClientsTable();
+  }catch(err){ tbody.innerHTML = ''; toast(err.message, true); }
 }
 
-document.getElementById('filter-server').addEventListener('change', loadClients);
-document.getElementById('filter-plan').addEventListener('change', loadClients);
-document.getElementById('filter-status').addEventListener('change', loadClients);
-document.getElementById('filter-name').addEventListener('input', loadClients);
+function renderClientsTable(){
+  const tbody = document.getElementById('clients-tbody');
+  const total = clientsAll.length;
+  const totalPages = Math.max(1, Math.ceil(total / CLIENTS_PER_PAGE));
+  if (clientsPage > totalPages) clientsPage = totalPages;
+  const start = (clientsPage - 1) * CLIENTS_PER_PAGE;
+  const pageRows = clientsAll.slice(start, start + CLIENTS_PER_PAGE);
+
+  tbody.innerHTML = pageRows.length
+    ? pageRows.map(renderClientRow).join('')
+    : '<tr><td colspan="13" class="empty-msg">Nenhum cliente cadastrado.</td></tr>';
+  staggerItems(tbody, 'tr', 30);
+
+  const pagEl = document.getElementById('clients-pagination');
+  pagEl.innerHTML = `
+    <button ${clientsPage <= 1 ? 'disabled' : ''} onclick="goClientsPage(${clientsPage - 1})">‹ Anterior</button>
+    <span class="page-info">${total ? `${start + 1}–${Math.min(clientsPage * CLIENTS_PER_PAGE, total)} de ${total}` : '0 resultados'}</span>
+    <button ${clientsPage >= totalPages ? 'disabled' : ''} onclick="goClientsPage(${clientsPage + 1})">Próxima ›</button>`;
+  document.getElementById('clients-count').textContent = total
+    ? `${total} cliente${total !== 1 ? 's' : ''}`
+    : 'Nenhum cliente encontrado';
+}
+
+window.goClientsPage = (p) => { clientsPage = p; renderClientsTable(); };
+
+function renderClientRow(c){
+  const discount = c.discount || 0;
+  const serverCost = c.server_cost || 0;
+  const net = c.price - discount - serverCost;
+  const due = c.due_date ? c.due_date.split('-').reverse().join('/') : '—';
+  return `
+  <tr>
+    <td>${escapeHtml(c.name || '—')}</td>
+    <td>${escapeHtml(c.phone || '—')}</td>
+    <td>${escapeHtml(c.server_name || '—')}</td>
+    <td>${c.server_cost > 0 ? money(c.server_cost) : '—'}</td>
+    <td>${escapeHtml(c.plan || '—')}</td>
+    <td>${money(c.price)}</td>
+    <td>${discount > 0 ? '-' + money(discount) : '—'}</td>
+    <td>${money(net)}</td>
+    <td>${due}</td>
+    <td>${escapeHtml(c.username || '—')}</td>
+    <td>${c.has_password
+      ? `<button class="btn-icon btn-copy" data-id="${c.id}" onclick="copyCredentials(this.dataset.id)" title="Copiar credenciais" aria-label="Copiar credenciais">${ICONS.copy}</button>`
+      : '<span class="table-count">—</span>'}</td>
+    <td><span class="badge ${escapeHtml(c.status)}">${escapeHtml(c.status)}</span></td>
+    <td class="row-actions">
+      <button class="btn-icon" data-id="${c.id}" onclick="editClient(this.dataset.id)" title="Editar" aria-label="Editar">${ICONS.edit}</button>
+      <button class="btn-icon" data-id="${c.id}" data-name="${escapeHtml(c.name)}" onclick="renewClient(${c.id}, this.dataset.name)" title="Renovar" aria-label="Renovar">${ICONS.renew}</button>
+      ${c.status === 'expirado' ? `<button class="btn-icon" data-id="${c.id}" data-name="${escapeHtml(c.name)}" onclick="sendRecovery(${c.id}, this.dataset.name)" title="Enviar recuperação" aria-label="Enviar recuperação">${ICONS.recovery}</button>` : ''}
+      <button class="btn-icon btn-icon-danger" data-id="${c.id}" onclick="deleteClient(this.dataset.id)" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>
+    </td>
+  </tr>`;
+}
+
+document.getElementById('filter-server').addEventListener('change', () => { clientsPage = 1; loadClients(); });
+document.getElementById('filter-plan').addEventListener('change', () => { clientsPage = 1; loadClients(); });
+document.getElementById('filter-status').addEventListener('change', () => { clientsPage = 1; loadClients(); });
+let filterDebounce;
+document.getElementById('filter-name').addEventListener('input', () => {
+  clearTimeout(filterDebounce);
+  filterDebounce = setTimeout(() => { clientsPage = 1; loadClients(); }, 300);
+});
 
 document.getElementById('btn-new-client').addEventListener('click', async ()=>{
   if(!serversCache.length) await loadServersCache();
@@ -345,7 +455,7 @@ window.editClient = async (id) => {
 };
 
 window.deleteClient = async (id) => {
-  if(!confirm('Excluir este cliente?')) return;
+  if(!await confirmDialog('Excluir este cliente? Esta ação não pode ser desfeita.')) return;
   try{
     await api('/clients/' + id, {method:'DELETE'});
     toast('Cliente excluído.');
@@ -444,25 +554,26 @@ document.getElementById('renew-confirm').addEventListener('click', async () => {
 
 // ---------- SERVIDORES ----------
 async function loadServers(){
+  const tbody = document.getElementById('servers-tbody');
+  tbody.innerHTML = '<tr class="row-loading"><td colspan="6">Carregando servidores…</td></tr>';
   try{
     const servers = await api('/servers');
     serversCache = servers;
-    const tbody = document.getElementById('servers-tbody');
     tbody.innerHTML = servers.length ? servers.map(s=>`
       <tr>
-        <td>${s.name}</td>
-        <td>${s.provider || '—'}</td>
+        <td>${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(s.provider || '—')}</td>
         <td>${money(s.cost)}</td>
         <td>${s.active_clients}</td>
-        <td><span class="badge ${s.status === 'ativo' ? 'ativo' : 'cancelado'}">${s.status}</span></td>
+        <td><span class="badge ${s.status === 'ativo' ? 'ativo' : 'cancelado'}">${escapeHtml(s.status)}</span></td>
         <td class="row-actions">
-          <button onclick="editServer(${s.id})">Editar</button>
-          <button onclick="deleteServer(${s.id})">Excluir</button>
+          <button class="btn-icon" data-id="${s.id}" onclick="editServer(${s.id})" title="Editar" aria-label="Editar">${ICONS.edit}</button>
+          <button class="btn-icon btn-icon-danger" data-id="${s.id}" onclick="deleteServer(${s.id})" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>
         </td>
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty-msg">Nenhum servidor cadastrado.</td></tr>';
     staggerItems(tbody, 'tr', 40);
-  }catch(err){ toast(err.message, true); }
+  }catch(err){ tbody.innerHTML = ''; toast(err.message, true); }
 }
 
 document.getElementById('btn-new-server').addEventListener('click', ()=>{
@@ -490,7 +601,7 @@ window.editServer = async (id) => {
 };
 
 window.deleteServer = async (id) => {
-  if(!confirm('Excluir este servidor?')) return;
+  if(!await confirmDialog('Excluir este servidor?')) return;
   try{ await api('/servers/' + id, {method:'DELETE'}); toast('Servidor excluído.'); loadServers(); }
   catch(err){ toast(err.message, true); }
 };
@@ -517,23 +628,24 @@ document.getElementById('server-save').addEventListener('click', async ()=>{
 
 // ---------- PLANOS ----------
 async function loadPlans(){
+  const tbody = document.getElementById('plans-tbody');
+  tbody.innerHTML = '<tr class="row-loading"><td colspan="6">Carregando planos…</td></tr>';
   try{
     const plans = await api('/plans');
     plansCache = plans;
-    const tbody = document.getElementById('plans-tbody');
     const durationLabel = (m) => m === 1 ? '1 mês' : m < 12 ? m + ' meses' : (m/12) + ' ano' + (m > 12 ? 's' : '');
     tbody.innerHTML = plans.length ? plans.map(p=>`
       <tr>
-        <td>${p.name}</td><td>${money(p.price)}</td><td>${durationLabel(p.duration_months)}</td>
+        <td>${escapeHtml(p.name)}</td><td>${money(p.price)}</td><td>${durationLabel(p.duration_months)}</td>
         <td>${p.screens || 1}</td><td>${p.active_clients}</td>
         <td class="row-actions">
-          <button onclick="editPlan(${p.id})">Editar</button>
-          <button onclick="deletePlan(${p.id})">Excluir</button>
+          <button class="btn-icon" data-id="${p.id}" onclick="editPlan(${p.id})" title="Editar" aria-label="Editar">${ICONS.edit}</button>
+          <button class="btn-icon btn-icon-danger" data-id="${p.id}" onclick="deletePlan(${p.id})" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>
         </td>
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty-msg">Nenhum plano cadastrado.</td></tr>';
     staggerItems(tbody, 'tr', 40);
-  }catch(err){ toast(err.message, true); }
+  }catch(err){ tbody.innerHTML = ''; toast(err.message, true); }
 }
 
 document.getElementById('btn-new-plan').addEventListener('click', ()=>{
@@ -559,7 +671,7 @@ window.editPlan = async (id) => {
 };
 
 window.deletePlan = async (id) => {
-  if(!confirm('Excluir este plano?')) return;
+  if(!await confirmDialog('Excluir este plano?')) return;
   try{ await api('/plans/' + id, {method:'DELETE'}); toast('Plano excluído.'); loadPlans(); plansCache = []; }
   catch(err){ toast(err.message, true); }
 };
@@ -657,7 +769,7 @@ async function loadFinanceiro(){
     const maxCount = Math.max(1, ...dash.serverRanking.map(s=>s.client_count));
     chartEl.innerHTML = dash.serverRanking.length ? dash.serverRanking.map(s=>`
       <div class="chart-row">
-        <span class="chart-label" title="${s.name}">${s.name}</span>
+        <span class="chart-label" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
         <span class="chart-bar-track"><span class="chart-bar-fill" style="width:${(s.client_count/maxCount*100)}%"></span></span>
         <span class="chart-count">${s.client_count} · ${money(s.mrr)}/mês</span>
       </div>
@@ -669,7 +781,7 @@ async function loadFinanceiro(){
     const maxPlan = Math.max(1, ...dash.planDistribution.map(p=>p.count));
     planEl.innerHTML = dash.planDistribution.length ? dash.planDistribution.map(p=>`
       <div class="chart-row">
-        <span class="chart-label" title="${p.plan_name}">${p.plan_name}</span>
+        <span class="chart-label" title="${escapeHtml(p.plan_name)}">${escapeHtml(p.plan_name)}</span>
         <span class="chart-bar-track"><span class="chart-bar-fill" style="width:${(p.count/maxPlan*100)}%"></span></span>
         <span class="chart-count">${p.count} · ${money(p.mrr)}/mês</span>
       </div>
@@ -686,12 +798,12 @@ async function loadFinanceiro(){
       return `
         <tr>
           <td>${day}/${m}/${y}</td>
-          <td>${s.client_name || '—'}</td>
-          <td>${s.phone || '—'}</td>
-          <td>${s.plan || '—'}</td>
+          <td>${escapeHtml(s.client_name || '—')}</td>
+          <td>${escapeHtml(s.phone || '—')}</td>
+          <td>${escapeHtml(s.plan || '—')}</td>
           <td>${typeLabel}</td>
           <td>${money(s.value)}</td>
-          <td><button class="btn-undo" onclick="undoSale(${s.id}, '${s.client_name || ''}')">Desfazer</button></td>
+          <td><button class="btn-undo" data-id="${s.id}" data-name="${escapeHtml(s.client_name || '')}" onclick="undoSale(${s.id}, this.dataset.name)">Desfazer</button></td>
         </tr>`;
     }).join('') : '<tr><td colspan="7" class="empty-msg">Nenhuma venda neste mês.</td></tr>';
     staggerItems(tbody, 'tr', 30);
@@ -699,7 +811,7 @@ async function loadFinanceiro(){
 }
 
 window.undoSale = async (id, clientName) => {
-  if (!confirm(`Desfazer venda de ${clientName}? O registro será removido do financeiro.`)) return;
+  if (!await confirmDialog(`Desfazer venda de ${clientName}? O registro será removido do financeiro.`)) return;
   try {
     await api('/sales/' + id, { method: 'DELETE' });
     toast('Venda desfeita com sucesso.');
@@ -749,7 +861,7 @@ document.getElementById('btn-wa-disconnect').addEventListener('click', async ()=
 
 // ---------- RECUPERAÇÃO ----------
 window.sendRecovery = async (id, name) => {
-  if (!confirm(`Enviar mensagem de recuperação para ${name}?`)) return;
+  if (!await confirmDialog(`Enviar mensagem de recuperação para ${name}?`, { title: 'Enviar recuperação' })) return;
   try {
     const result = await api('/whatsapp/send-recovery', { method: 'POST', body: JSON.stringify({ client_id: id }) });
     const label = result.type === 'recovery' ? 'recuperação' : 'pós-vencimento';
@@ -782,11 +894,11 @@ async function loadQueue() {
       currentSection.style.display = 'block';
       currentItem.innerHTML = `
         <div class="queue-item-info">
-          <div class="queue-item-phone">${status.current.phone}</div>
+          <div class="queue-item-phone">${escapeHtml(status.current.phone)}</div>
           <div class="queue-item-message">${escapeHtml(status.current.message)}</div>
         </div>
         <div class="queue-item-meta">
-          <span class="queue-item-type ${status.current.type}">${status.current.type}</span>
+          <span class="queue-item-type ${status.current.type}">${escapeHtml(status.current.type)}</span>
           <span class="queue-item-time">enviando...</span>
         </div>
       `;
@@ -801,11 +913,11 @@ async function loadQueue() {
       pendingList.innerHTML = pending.map(item => `
         <div class="queue-item" id="queue-item-${item.id}">
           <div class="queue-item-info">
-            <div class="queue-item-phone">${item.phone} ${item.client_name ? '(' + escapeHtml(item.client_name) + ')' : ''}</div>
+            <div class="queue-item-phone">${escapeHtml(item.phone)} ${item.client_name ? '(' + escapeHtml(item.client_name) + ')' : ''}</div>
             <div class="queue-item-message">${escapeHtml(item.message)}</div>
           </div>
           <div class="queue-item-meta">
-            <span class="queue-item-type ${item.type}">${item.type}</span>
+            <span class="queue-item-type ${item.type}">${escapeHtml(item.type)}</span>
             <span class="queue-item-time">${formatTime(item.created_at)}</span>
             <button class="queue-item-cancel" onclick="cancelQueueItem(${item.id})">Cancelar</button>
           </div>
@@ -821,11 +933,11 @@ async function loadQueue() {
       historyList.innerHTML = history.map(item => `
         <div class="queue-item">
           <div class="queue-item-info">
-            <div class="queue-item-phone">${item.phone} ${item.client_name ? '(' + escapeHtml(item.client_name) + ')' : ''}</div>
+            <div class="queue-item-phone">${escapeHtml(item.phone)} ${item.client_name ? '(' + escapeHtml(item.client_name) + ')' : ''}</div>
             <div class="queue-item-message">${escapeHtml(item.message)}</div>
           </div>
           <div class="queue-item-meta">
-            <span class="queue-item-type ${item.type}">${item.type}</span>
+            <span class="queue-item-type ${item.type}">${escapeHtml(item.type)}</span>
             <span class="queue-item-status ${item.status}">${item.status === 'sent' ? 'Enviado' : item.status === 'error' ? 'Erro' : 'Cancelado'}</span>
             <span class="queue-item-time">${item.sent_at ? formatTime(item.sent_at) : ''}</span>
             ${item.error ? `<span class="queue-item-message" style="color:var(--danger);max-width:150px">${escapeHtml(item.error)}</span>` : ''}
@@ -866,7 +978,7 @@ window.cancelQueueItem = async (id) => {
 document.getElementById('btn-queue-refresh').addEventListener('click', loadQueue);
 
 document.getElementById('btn-queue-cancel-all').addEventListener('click', async () => {
-  if (!confirm('Cancelar todas as mensagens pendentes na fila?')) return;
+  if (!await confirmDialog('Cancelar todas as mensagens pendentes na fila?')) return;
   try {
     await api('/whatsapp/queue/cancel-all', { method: 'POST' });
     toast('Todas as mensagens pendentes foram canceladas.');
@@ -875,7 +987,7 @@ document.getElementById('btn-queue-cancel-all').addEventListener('click', async 
 });
 
 document.getElementById('btn-queue-clear').addEventListener('click', async () => {
-  if (!confirm('Limpar todo o histórico de mensagens?')) return;
+  if (!await confirmDialog('Limpar todo o histórico de mensagens?')) return;
   try {
     await api('/whatsapp/queue/clear-history', { method: 'POST' });
     toast('Histórico limpo.');
@@ -1079,23 +1191,23 @@ function renderResellerKPIs(list) {
 
 function renderResellers(list) {
   const tbody = document.getElementById('resellers-tbody');
-  tbody.innerHTML = list.map(r => {
+  tbody.innerHTML = list.length ? list.map(r => {
     const profitClass = (r.net_profit || 0) >= 0 ? 'rev-profit-pos' : 'rev-profit-neg';
     return `<tr>
       <td>${escapeHtml(r.name)}</td>
       <td>${escapeHtml(r.phone || '—')}</td>
       <td>${escapeHtml(r.email || '—')}</td>
-      <td><span class="status-badge ${r.status === 'ativo' ? 'badge-active' : 'badge-inactive'}">${r.status}</span></td>
+      <td><span class="status-badge ${r.status === 'ativo' ? 'badge-active' : 'badge-inactive'}">${escapeHtml(r.status)}</span></td>
       <td>${r.total_purchases || 0}</td>
       <td>${r.total_credits || 0}</td>
       <td>R$ ${(r.total_revenue || 0).toFixed(2)}</td>
       <td class="${profitClass}">R$ ${(r.net_profit || 0).toFixed(2)}</td>
       <td>
-        <button class="btn-icon" onclick="editReseller(${r.id})" title="Editar">✏️</button>
-        <button class="btn-icon" onclick="deleteReseller(${r.id})" title="Excluir">🗑️</button>
+        <button class="btn-icon" onclick="editReseller(${r.id})" title="Editar" aria-label="Editar">${ICONS.edit}</button>
+        <button class="btn-icon btn-icon-danger" onclick="deleteReseller(${r.id})" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('') : '<tr><td colspan="9" class="empty-msg">Nenhum revendedor cadastrado.</td></tr>';
 }
 
 async function loadPurchases() {
@@ -1109,7 +1221,7 @@ async function loadPurchases() {
 
 function renderPurchases(list) {
   const tbody = document.getElementById('purchases-tbody');
-  tbody.innerHTML = list.map(p => {
+  tbody.innerHTML = list.length ? list.map(p => {
     const profit = p.net_profit || 0;
     const profitClass = profit >= 0 ? 'rev-profit-pos' : 'rev-profit-neg';
     return `<tr>
@@ -1121,11 +1233,11 @@ function renderPurchases(list) {
       <td>R$ ${(p.cost_per_credit || 0).toFixed(2)}</td>
       <td class="${profitClass}">R$ ${profit.toFixed(2)}</td>
       <td>
-        <button class="btn-icon" onclick="editPurchase(${p.id})" title="Editar">✏️</button>
-        <button class="btn-icon" onclick="deletePurchase(${p.id})" title="Excluir">🗑️</button>
+        <button class="btn-icon" onclick="editPurchase(${p.id})" title="Editar" aria-label="Editar">${ICONS.edit}</button>
+        <button class="btn-icon btn-icon-danger" onclick="deletePurchase(${p.id})" title="Excluir" aria-label="Excluir">${ICONS.trash}</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('') : '<tr><td colspan="8" class="empty-msg">Nenhuma compra neste mês.</td></tr>';
 }
 
 function populateResellerSelects() {
@@ -1180,7 +1292,7 @@ document.getElementById('reseller-save').addEventListener('click', async () => {
   } catch (err) { toast(err.message, true); }
 });
 window.deleteReseller = async function(id) {
-  if (!confirm('Excluir este revendedor?')) return;
+  if (!await confirmDialog('Excluir este revendedor?')) return;
   try { await api('/resellers/' + id, { method: 'DELETE' }); toast('Revendedor excluído.'); loadResellers(); }
   catch (err) { toast(err.message, true); }
 };
@@ -1239,10 +1351,37 @@ document.getElementById('purchase-save').addEventListener('click', async () => {
   } catch (err) { toast(err.message, true); }
 });
 window.deletePurchase = async function(id) {
-  if (!confirm('Excluir esta compra?')) return;
+  if (!await confirmDialog('Excluir esta compra?')) return;
   try { await api('/resellers/purchases/' + id, { method: 'DELETE' }); toast('Compra excluída.'); loadResellers(); }
   catch (err) { toast(err.message, true); }
 };
+
+// ---------- TESTE DE ENVIO (WHATSAPP) ----------
+document.getElementById('btn-wa-test').addEventListener('click', async () => {
+  const phone = document.getElementById('wa-test-phone').value.trim();
+  const which = document.getElementById('wa-test-template').value;
+  if (!phone) { toast('Informe o telefone de teste.', true); return; }
+  const templates = {
+    reminder: 'reminder-template',
+    welcome: 'welcome-template',
+    recovery: 'recovery-template',
+    'post-expiry': 'post-expiry-template',
+    renewal: 'renewal-template'
+  };
+  const message = document.getElementById(templates[which]).value;
+  if (!message) { toast('O modelo selecionado está vazio.', true); return; }
+  const btn = document.getElementById('btn-wa-test');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  try {
+    const res = await api('/whatsapp/test-message', { method: 'POST', body: JSON.stringify({ phone, message }) });
+    toast(res.queueId ? `Mensagem de teste enfileirada (id ${res.queueId}).` : 'Mensagem de teste enfileirada.');
+  } catch (err) { toast(err.message, true); }
+  finally {
+    btn.disabled = false;
+    btn.textContent = 'Enviar teste';
+  }
+});
 
 // ---------- INICIALIZAÇÃO ----------
 async function init() {
