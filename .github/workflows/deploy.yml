@@ -18,6 +18,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -30,6 +31,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: IMAGE_DIGEST
           script: |
-            docker pull r33xcrypt/client-manager:latest
-            docker service update --force client_manager_app
+            docker pull "r33xcrypt/client-manager@$IMAGE_DIGEST"
+            docker service update --image "r33xcrypt/client-manager@$IMAGE_DIGEST" client_manager_app
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
