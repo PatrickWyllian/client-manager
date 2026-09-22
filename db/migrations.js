@@ -99,9 +99,16 @@ function runMigrations() {
       scheduled_at TEXT,
       sent_at TEXT,
       error TEXT,
+      attempts INTEGER DEFAULT 0,
       FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
     )
   `);
+
+  const mqColumns = db.prepare("PRAGMA table_info(message_queue)").all();
+  if (!mqColumns.some(c => c.name === 'attempts')) {
+    db.exec("ALTER TABLE message_queue ADD COLUMN attempts INTEGER DEFAULT 0");
+    console.log('[db] Migração: adicionada coluna attempts em message_queue');
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (

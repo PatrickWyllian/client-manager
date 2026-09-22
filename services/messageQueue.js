@@ -1,7 +1,9 @@
 const db = require('../db/database');
 const { EventEmitter } = require('events');
-const { normalizePhone } = require('../lib/validators');
 const { recordNotification } = require('./scheduler');
+
+const MAX_ATTEMPTS = 3;
+const STALE_MS = 30 * 60 * 1000;
 
 /**
  * Spintax parser: replaces {option1|option2|option3} with a random choice
@@ -49,6 +51,17 @@ class MessageQueue extends EventEmitter {
   async _processNext() {
     if (this.processing) return;
 
+    // Recupera filas presas em 'sending' (processo caiu antes do ack/timeout)
+    // e as devolve a 'pending' para nova tentativa (com limite de attempts).
+    db.prepare(`
+      UPDATE message_queue
+      SET status = 'pending'
+      WHERE status = 'sending'
+        AND (attempts IS NULL OR attempts < ?)
+        AND datetime(created_at) < datetime('now', 'localtime', ?
+      )
+    `).run(MAX_ATTEMPTS, `-${Math.floor(STALE_MS / 60000)} minutes`);
+
     // Se estiver fora do horário comercial para envios automáticos, aguardar
     if (!isBusinessHours()) {
       console.log('[messageQueue] Fora do horário comercial (08h–20h). Fila pausada até as 08:00.');
@@ -69,10 +82,19 @@ class MessageQueue extends EventEmitter {
     this.processing = true;
     this.emit('queue:processing', pending);
 
+    // Marca como 'sending' para não re-pescar a mesma mensagem enquanto enviamos
+    db.prepare(
+      "UPDATE message_queue SET status = 'sending' WHERE id = ?"
+    ).run(pending.id);
+
     let nextDelayMs = this.defaultIntervalMs;
 
     try {
       if (this.waService.getStatus().status !== 'connected') {
+        // Devolve para 'pending' e tenta de novo em instantes
+        db.prepare(
+          "UPDATE message_queue SET status = 'pending' WHERE id = ?"
+        ).run(pending.id);
         this.processing = false;
         this.timer = setTimeout(() => this._processNext(), 10000);
         return;
@@ -80,15 +102,13 @@ class MessageQueue extends EventEmitter {
 
       // Aplica Spintax nas mensagens para variação anti-spam
       const finalMessage = parseSpintax(pending.message);
-      const normalized = normalizePhone(pending.phone);
-      if (!normalized) {
-        throw new Error(`Telefone inválido: ${pending.phone}`);
-      }
-      const jid = `${normalized}@s.whatsapp.net`;
-      await this.waService.sock.sendMessage(jid, { text: finalMessage });
+
+      // sendMessage agora aguarda o ACK real do servidor (SERVER_ACK+).
+      // Se o WhatsApp não confirmar, lança erro e NÃO marcamos como enviada.
+      await this.waService.sendMessage(pending.phone, finalMessage);
 
       db.prepare(
-        "UPDATE message_queue SET status = 'sent', sent_at = datetime('now', 'localtime') WHERE id = ?"
+        "UPDATE message_queue SET status = 'sent', sent_at = datetime('now', 'localtime'), attempts = COALESCE(attempts, 0) + 1 WHERE id = ?"
       ).run(pending.id);
 
       // Registra a notificação somente após o envio CONFIRMADO,
@@ -119,27 +139,39 @@ class MessageQueue extends EventEmitter {
       }
     } catch (err) {
       console.error('[messageQueue] Erro ao enviar mensagem:', err.message);
-      db.prepare(
-        "UPDATE message_queue SET status = 'error', error = ? WHERE id = ?"
-      ).run(err.message, pending.id);
 
-      this.emit('queue:error', { ...pending, error: err.message });
+      const attempts = (pending.attempts || 0) + 1;
 
-      if (this.io) {
-        let clientName = pending.phone;
-        if (pending.client_id) {
-          const client = db.prepare("SELECT name FROM clients WHERE id = ?").get(pending.client_id);
-          if (client) clientName = client.name;
+      // Envio não confirmado: tenta de novo (com limite), sem dar falso "enviada".
+      if (attempts < MAX_ATTEMPTS) {
+        db.prepare(
+          "UPDATE message_queue SET status = 'pending', attempts = ? WHERE id = ?"
+        ).run(attempts, pending.id);
+        console.log(`[messageQueue] Reenfileirando (attempt ${attempts}/${MAX_ATTEMPTS}): ${pending.phone}`);
+        this.emit('queue:requeued', { ...pending, attempts });
+      } else {
+        db.prepare(
+          "UPDATE message_queue SET status = 'error', error = ?, attempts = ? WHERE id = ?"
+        ).run(err.message, attempts, pending.id);
+
+        this.emit('queue:error', { ...pending, error: err.message });
+
+        if (this.io) {
+          let clientName = pending.phone;
+          if (pending.client_id) {
+            const client = db.prepare("SELECT name FROM clients WHERE id = ?").get(pending.client_id);
+            if (client) clientName = client.name;
+          }
+          this.io.emit('wa:message-error', {
+            id: pending.id,
+            client_id: pending.client_id,
+            clientName,
+            phone: pending.phone,
+            type: pending.type,
+            error: err.message
+          });
+          this.io.emit('wa:queue-update', this.getQueueStatus());
         }
-        this.io.emit('wa:message-error', {
-          id: pending.id,
-          client_id: pending.client_id,
-          clientName,
-          phone: pending.phone,
-          type: pending.type,
-          error: err.message
-        });
-        this.io.emit('wa:queue-update', this.getQueueStatus());
       }
     } finally {
       this.processing = false;
@@ -200,7 +232,7 @@ class MessageQueue extends EventEmitter {
     ).get();
 
     const processing = db.prepare(
-      "SELECT * FROM message_queue WHERE status = 'pending' ORDER BY priority DESC, created_at ASC LIMIT 1"
+      "SELECT * FROM message_queue WHERE status IN ('pending', 'sending') ORDER BY priority DESC, created_at ASC LIMIT 1"
     ).get();
 
     const stats = db.prepare(`
@@ -224,7 +256,7 @@ class MessageQueue extends EventEmitter {
       SELECT mq.*, c.name as client_name
       FROM message_queue mq
       LEFT JOIN clients c ON c.id = mq.client_id
-      WHERE mq.status IN ('pending', 'processing')
+      WHERE mq.status IN ('pending', 'processing', 'sending')
       ORDER BY mq.priority DESC, mq.created_at ASC
       LIMIT ?
     `).all(limit);
