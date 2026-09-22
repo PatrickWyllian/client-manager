@@ -204,7 +204,19 @@ class MessageQueue extends EventEmitter {
 
   cancel(id) {
     db.prepare(
-      "UPDATE message_queue SET status = 'cancelled' WHERE id = ? AND status = 'pending'"
+      "UPDATE message_queue SET status = 'cancelled' WHERE id = ? AND status IN ('pending', 'sending')"
+    ).run(id);
+
+    this.emit('queue:cancelled', id);
+
+    if (this.io) {
+      this.io.emit('wa:queue-update', this.getQueueStatus());
+    }
+  }
+
+  forceCancel(id) {
+    db.prepare(
+      "UPDATE message_queue SET status = 'cancelled' WHERE id = ? AND status NOT IN ('sent', 'cancelled', 'error')"
     ).run(id);
 
     this.emit('queue:cancelled', id);
@@ -216,7 +228,7 @@ class MessageQueue extends EventEmitter {
 
   cancelAll() {
     db.prepare(
-      "UPDATE message_queue SET status = 'cancelled' WHERE status = 'pending'"
+      "UPDATE message_queue SET status = 'cancelled' WHERE status IN ('pending', 'sending')"
     ).run();
 
     this.emit('queue:cleared');
@@ -256,7 +268,7 @@ class MessageQueue extends EventEmitter {
       SELECT mq.*, c.name as client_name
       FROM message_queue mq
       LEFT JOIN clients c ON c.id = mq.client_id
-      WHERE mq.status IN ('pending', 'processing', 'sending')
+      WHERE mq.status IN ('pending', 'sending')
       ORDER BY mq.priority DESC, mq.created_at ASC
       LIMIT ?
     `).all(limit);

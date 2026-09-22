@@ -15,13 +15,14 @@ const { normalizePhone } = require('../lib/validators');
 const AUTH_DIR = path.join(__dirname, '..', 'data', 'wa-auth');
 
 // janela máxima para aguardar confirmação (ack) do servidor após o envio
-const ACK_TIMEOUT_MS = 45000;
+// Valor padrão 45s; pode ser sobrescrito via setting 'ack_timeout_ms'
+const DEFAULT_ACK_TIMEOUT_MS = 45000;
 
 class WhatsAppService {
   constructor(io) {
     this.io = io;
     this.sock = null;
-    this.status = 'disconnected'; // disconnected | connecting | qr | connected
+    this.status = 'disconnected';
     this.qrDataUrl = null;
     this.phoneNumber = null;
     this.queue = null;
@@ -29,11 +30,16 @@ class WhatsAppService {
     this.reconnectDelayMs = 5000;
     this.disconnectCount = 0;
     this.lastStatusCode = null;
-    this.pendingAcks = new Map(); // messageId -> { resolve, reject, timer }
+    this.pendingAcks = new Map();
+    this.ackTimeoutMs = DEFAULT_ACK_TIMEOUT_MS;
   }
 
   setQueue(queue) {
     this.queue = queue;
+  }
+
+  setAckTimeoutMs(ms) {
+    if (ms && ms > 0) this.ackTimeoutMs = ms;
   }
 
   emitStatus() {
@@ -102,6 +108,27 @@ class WhatsAppService {
           clearTimeout(pending.timer);
           this.pendingAcks.delete(key.id);
           // Só conta como entregue quando o servidor confirma (SERVER_ACK ou superior)
+          if (status <= proto.WebMessageInfo.Status.PENDING) {
+            pending.reject(new Error(`WhatsApp não confirmou a mensagem (ack status ${status}).`));
+          } else {
+            pending.resolve(status);
+          }
+        }
+      });
+
+      // Handler para messages.upsert: captura acks de auto-envio (fromMe:true)
+      // que chegam via 'append' type quando a mensagem volta para o próprio chat.
+      this.sock.ev.on('messages.upsert', (upsert) => {
+        if (upsert.type !== 'append' || !upsert.messages) return;
+        for (const msg of upsert.messages) {
+          const key = msg.key;
+          if (!key || !key.id || key.fromMe !== true) continue;
+          const status = msg.status;
+          if (typeof status === 'undefined' || status === null) continue;
+          const pending = this.pendingAcks.get(key.id);
+          if (!pending) continue;
+          clearTimeout(pending.timer);
+          this.pendingAcks.delete(key.id);
           if (status <= proto.WebMessageInfo.Status.PENDING) {
             pending.reject(new Error(`WhatsApp não confirmou a mensagem (ack status ${status}).`));
           } else {
@@ -237,12 +264,13 @@ class WhatsAppService {
     return { ...result, ackStatus: status };
   }
 
-  waitForAck(msgId, timeoutMs = ACK_TIMEOUT_MS) {
+  waitForAck(msgId, timeoutMs = null) {
+    const timeout = timeoutMs || this.ackTimeoutMs;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingAcks.delete(msgId);
         reject(new Error('Sem confirmação do WhatsApp (timeout ack).'));
-      }, timeoutMs);
+      }, timeout);
       this.pendingAcks.set(msgId, { resolve, reject, timer });
     });
   }

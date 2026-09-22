@@ -119,6 +119,17 @@ function runMigrations() {
     )
   `);
 
+  // Seed admin user from env if not exists
+  if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
+    const bcrypt = require('bcryptjs');
+    const existing = db.prepare('SELECT 1 FROM users WHERE username = ?').get(process.env.ADMIN_USER);
+    if (!existing) {
+      const hash = bcrypt.hashSync(process.env.ADMIN_PASS, 10);
+      db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(process.env.ADMIN_USER, hash);
+      console.log('[db] Usuário admin criado a partir de variáveis de ambiente.');
+    }
+  }
+
   // ── REVENDEDORES ──────────────────────────────────────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS resellers (

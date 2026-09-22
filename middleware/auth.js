@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
+if (!process.env.JWT_SECRET) {
+  console.error('[auth] ERRO CRÍTICO: JWT_SECRET não definido no ambiente. Encerrando.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function authMiddleware(req, res, next) {
   const url = req.originalUrl || req.url;

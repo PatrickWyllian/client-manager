@@ -121,6 +121,12 @@ module.exports = (waService, messageQueue) => {
     res.json({ ok: true });
   });
 
+  // Forçar cancelamento de mensagem presa (qualquer status exceto sent/cancelled/error)
+  router.post('/queue/:id/force-cancel', (req, res) => {
+    messageQueue.forceCancel(parseInt(req.params.id));
+    res.json({ ok: true });
+  });
+
   // Cancelar todas as pendentes
   router.post('/queue/cancel-all', (req, res) => {
     messageQueue.cancelAll();

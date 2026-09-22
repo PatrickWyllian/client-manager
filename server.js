@@ -29,17 +29,23 @@ process.on('uncaughtException', (err) => {
 const app = express();
 const server = http.createServer(app);
 
+const PORT = process.env.PORT || 3400;
+
+if (!process.env.CORS_ORIGIN) {
+  console.error('[server] ERRO CRÍTICO: CORS_ORIGIN não definido no ambiente. Encerrando.');
+  process.exit(1);
+}
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
+
 // Confia no proxy reverso (Traefik) para o rate-limit funcionar corretamente
 app.set('trust proxy', 1);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "*",
-    methods: ["GET", "POST"]
+    origin: CORS_ORIGIN,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
-
-const PORT = process.env.PORT || 3400;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || `http://localhost:${PORT}`;
 
 // Autenticação do Socket.IO: exige o mesmo JWT usado na API (via cookie ou handshake.auth.token).
 io.use((socket, next) => {
@@ -64,20 +70,25 @@ io.use((socket, next) => {
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
-// CORS
+// CORS - only allow configured origin
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin === CORS_ORIGIN || !origin) {
+  if (origin === CORS_ORIGIN) {
     res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -126,6 +137,19 @@ app.use('/api/sales', require('./routes/sales'));
 app.use('/api/settings', require('./routes/settings')(waService, io));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/resellers', require('./routes/resellers'));
+
+// Health check endpoint (para Swarm/Traefik) - DEVE vir ANTES do catch-all
+app.get('/healthz', (req, res) => {
+  const waStatus = waService.getStatus();
+  const dbOk = true; // SQLite local, assume ok se chegou aqui
+  const healthy = waStatus.status === 'connected' && dbOk;
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'healthy' : 'unhealthy',
+    whatsapp: waStatus.status,
+    database: dbOk ? 'ok' : 'error',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Redirect to login for non-API, non-static routes
 app.get('*', (req, res, next) => {

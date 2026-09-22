@@ -6,7 +6,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",
@@ -22,5 +24,18 @@
     "pino": "^9.4.0",
     "qrcode": "^1.5.4",
     "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.js"],
+    "collectCoverageFrom": [
+      "lib/**/*.js",
+      "services/**/*.js",
+      "routes/**/*.js",
+      "middleware/**/*.js"
+    ]
   }
 }
