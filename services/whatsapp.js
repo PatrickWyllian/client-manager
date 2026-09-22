@@ -47,8 +47,9 @@ class WhatsAppService {
   }
 
   isSocketUsable() {
-    const ws = this.sock && this.sock.ws;
-    return !!ws && ws.readyState === 1; // WebSocket.OPEN
+    // Baileys nesta versão não expõe readyState no objeto ws.
+    // "Conectado de verdade" é sinalizado pelo evento connection: open.
+    return this.status === 'connected' && !!this.sock;
   }
 
   async connect() {
