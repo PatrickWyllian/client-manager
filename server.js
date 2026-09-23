@@ -152,6 +152,82 @@ app.get('/healthz', (req, res) => {
   });
 });
 
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    const db = require('./db/database');
+    const waStatus = waService.getStatus();
+    
+    // Collect metrics
+    const clientCount = db.prepare("SELECT COUNT(*) as count FROM clients WHERE status = 'ativo'").get().count || 0;
+    const expiredCount = db.prepare("SELECT COUNT(*) as count FROM clients WHERE status = 'expirado'").get().count || 0;
+    const pendingQueue = db.prepare("SELECT COUNT(*) as count FROM message_queue WHERE status = 'pending'").get().count || 0;
+    const sendingQueue = db.prepare("SELECT COUNT(*) as count FROM message_queue WHERE status = 'sending'").get().count || 0;
+    const errorQueue = db.prepare("SELECT COUNT(*) as count FROM message_queue WHERE status = 'error'").get().count || 0;
+    const sentQueue = db.prepare("SELECT COUNT(*) as count FROM message_queue WHERE status = 'sent'").get().count || 0;
+    const legacySentQueue = db.prepare("SELECT COUNT(*) as count FROM message_queue WHERE status = 'legacy_sent'").get().count || 0;
+    
+    let metrics = '';
+    metrics += `# HELP client_manager_clients_active Total active clients\n`;
+    metrics += `# TYPE client_manager_clients_active gauge\n`;
+    metrics += `client_manager_clients_active ${clientCount}\n`;
+    
+    metrics += `# HELP client_manager_clients_expired Total expired clients\n`;
+    metrics += `# TYPE client_manager_clients_expired gauge\n`;
+    metrics += `client_manager_clients_expired ${expiredCount}\n`;
+    
+    metrics += `# HELP client_manager_queue_pending Messages pending in queue\n`;
+    metrics += `# TYPE client_manager_queue_pending gauge\n`;
+    metrics += `client_manager_queue_pending ${pendingQueue}\n`;
+    
+    metrics += `# HELP client_manager_queue_sending Messages currently sending\n`;
+    metrics += `# TYPE client_manager_queue_sending gauge\n`;
+    metrics += `client_manager_queue_sending ${sendingQueue}\n`;
+    
+    metrics += `# HELP client_manager_queue_error Messages with error\n`;
+    metrics += `# TYPE client_manager_queue_error gauge\n`;
+    metrics += `client_manager_queue_error ${errorQueue}\n`;
+    
+    metrics += `# HELP client_manager_queue_sent Messages sent successfully\n`;
+    metrics += `# TYPE client_manager_queue_sent gauge\n`;
+    metrics += `client_manager_queue_sent ${sentQueue}\n`;
+    
+    metrics += `# HELP client_manager_queue_legacy_sent Legacy messages marked as sent (no ack)\n`;
+    metrics += `# TYPE client_manager_queue_legacy_sent gauge\n`;
+    metrics += `client_manager_queue_legacy_sent ${legacySentQueue}\n`;
+    
+    metrics += `# HELP client_manager_whatsapp_status WhatsApp connection status (1=connected, 0=disconnected)\n`;
+    metrics += `# TYPE client_manager_whatsapp_status gauge\n`;
+    metrics += `client_manager_whatsapp_status ${waStatus.status === 'connected' ? 1 : 0}\n`;
+    
+    metrics += `# HELP client_manager_whatsapp_disconnect_count Number of WhatsApp disconnections\n`;
+    metrics += `# TYPE client_manager_whatsapp_disconnect_count counter\n`;
+    metrics += `client_manager_whatsapp_disconnect_count ${waStatus.disconnectCount || 0}\n`;
+    
+    metrics += `# HELP client_manager_whatsapp_pending_acks Pending ACKs waiting for confirmation\n`;
+    metrics += `# TYPE client_manager_whatsapp_pending_acks gauge\n`;
+    metrics += `client_manager_whatsapp_pending_acks ${waStatus.pendingAcks || 0}\n`;
+    
+    metrics += `# HELP client_manager_uptime_seconds Process uptime in seconds\n`;
+    metrics += `# TYPE client_manager_uptime_seconds counter\n`;
+    metrics += `client_manager_uptime_seconds ${Math.floor(process.uptime())}\n`;
+    
+    metrics += `# HELP client_manager_memory_usage_bytes Process memory usage in bytes\n`;
+    metrics += `# TYPE client_manager_memory_usage_bytes gauge\n`;
+    const mem = process.memoryUsage();
+    metrics += `client_manager_memory_usage_bytes{type="rss"} ${mem.rss}\n`;
+    metrics += `client_manager_memory_usage_bytes{type="heapUsed"} ${mem.heapUsed}\n`;
+    metrics += `client_manager_memory_usage_bytes{type="heapTotal"} ${mem.heapTotal}\n`;
+    metrics += `client_manager_memory_usage_bytes{type="external"} ${mem.external}\n`;
+    
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(metrics);
+  } catch (err) {
+    logger.error({ err: err.message }, 'Error generating metrics');
+    res.status(500).send('Error generating metrics');
+  }
+});
+
 // Redirect to login for non-API, non-static routes
 app.get('*', (req, res, next) => {
   if (!req.path.startsWith('/api/') && req.path !== '/' && req.path !== '/login') {
