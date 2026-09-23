@@ -34,15 +34,21 @@ if (mobileMenuToggle) {
     const data = await res.json();
     if (!data.authenticated) {
       window.location.href = '/login.html';
-
+      return;
     }
   } catch {
     window.location.href = '/login.html';
-
+    return;
   }
 })();
 
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 2000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000,
+});
 
 // ---------- MICRO-ANIMATIONS HELPERS ----------
 function animateValue(el, start, end, duration = 600) {
@@ -100,8 +106,14 @@ function toast(msg, isError = false){
 async function api(path, options = {}){
   const res = await fetch('/api' + path, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // Importante para enviar cookies
     ...options,
   });
+  if (res.status === 401) {
+    // Token expirado ou inválido - redirecionar para login
+    window.location.href = '/login.html';
+    return;
+  }
   if (!res.ok){
     const body = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
     throw new Error(body.error || 'Erro na requisição');
