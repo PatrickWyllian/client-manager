@@ -1,0 +1,123 @@
+groups:
+  - name: client-manager-alerts
+    interval: 30s
+    rules:
+      # WhatsApp Connection Alerts
+      - alert: WhatsAppDisconnected
+        expr: client_manager_whatsapp_status == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WhatsApp disconnected"
+          description: "WhatsApp has been disconnected for more than 2 minutes. Check container logs and restart if needed."
+
+      - alert: WhatsAppHighDisconnectCount
+        expr: client_manager_whatsapp_disconnect_count > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WhatsApp disconnect count"
+          description: "WhatsApp has disconnected {{ $value }} times. Check network stability and container resources."
+
+      - alert: WhatsAppHighPendingAcks
+        expr: client_manager_whatsapp_pending_acks > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High pending WhatsApp ACKs"
+          description: "{{ $value }} messages pending ACK confirmation. Messages may not be delivering."
+
+      # Queue Alerts
+      - alert: HighQueuePending
+        expr: client_manager_queue_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High pending message queue"
+          description: "{{ $value }} messages pending in queue. Check WhatsApp connection and processing speed."
+
+      - alert: HighQueueErrors
+        expr: client_manager_queue_error > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High message queue error rate"
+          description: "{{ $value }} messages in error state. Check WhatsApp connection and message content."
+
+      - alert: QueueStuckSending
+        expr: client_manager_queue_sending > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Messages stuck in sending state"
+          description: "{{ $value }} messages stuck in 'sending' state. Possible ACK timeout issues."
+
+      # Client Alerts
+      - alert: HighExpiredClients
+        expr: client_manager_clients_expired > 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of expired clients"
+          description: "{{ $value }} clients are expired. Run recovery campaigns."
+
+      - alert: NoActiveClients
+        expr: client_manager_clients_active == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active clients"
+          description: "Zero active clients in system. Check data integrity."
+
+      # System Alerts
+      - alert: HighHeapUsage
+        expr: (client_manager_memory_usage_bytes{type="heapUsed"} / client_manager_memory_usage_bytes{type="heapTotal"}) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High heap memory usage"
+          description: "Heap usage at {{ $value | printf \"%.1f\" }}%. Consider restart or memory optimization."
+
+      - alert: HighRSSMemory
+        expr: client_manager_memory_usage_bytes{type="rss"} > 500000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High RSS memory usage"
+          description: "RSS memory usage is {{ $value | humanize1024 }}. Check for memory leaks."
+
+      - alert: ProcessRestarted
+        expr: changes(client_manager_uptime_seconds[5m]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "Process restarted"
+          description: "Client Manager process was restarted. Uptime reset to {{ $value }} seconds."
+
+      - alert: HighQueueErrorsRate
+        expr: rate(client_manager_queue_error[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High queue error rate"
+          description: "Error rate is {{ $value | printf \"%.2f\" }} per second. Immediate investigation needed."
+
+      - alert: WhatsAppPendingAckTimeout
+        expr: client_manager_whatsapp_pending_acks > 20 and client_manager_whatsapp_pending_acks == client_manager_whatsapp_pending_acks offset 10m
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WhatsApp ACKs stuck"
+          description: "Pending ACKs stuck at {{ $value }} for 10+ minutes. Messages not getting delivery confirmation."

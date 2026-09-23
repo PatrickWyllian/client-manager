@@ -1,0 +1,319 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 0}
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "legend": {"calcs": [], "displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [
+        {
+          "expr": "client_manager_whatsapp_status",
+          "legendFormat": "WhatsApp Status",
+          "refId": "A"
+        }
+      ],
+      "title": "WhatsApp Connection Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 50},
+              {"color": "red", "value": 100}
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "expr": "client_manager_whatsapp_disconnect_count",
+          "legendFormat": "Disconnect Count",
+          "refId": "A"
+        }
+      ],
+      "title": "WhatsApp Disconnect Count",
+      "type": "gauge"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "expr": "client_manager_whatsapp_pending_acks",
+          "legendFormat": "Pending ACKs",
+          "refId": "A"
+        }
+      ],
+      "title": "Pending WhatsApp ACKs",
+      "type": "gauge"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "expr": "client_manager_queue_pending",
+          "legendFormat": "Pending",
+          "refId": "A"
+        },
+        {
+          "expr": "client_manager_queue_sending",
+          "legendFormat": "Sending",
+          "refId": "B"
+        },
+        {
+          "expr": "client_manager_queue_error",
+          "legendFormat": "Error",
+          "refId": "C"
+        }
+      ],
+      "title": "Message Queue Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "green", "value": 10}
+            ]
+          ],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 4},
+      "id": 5,
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "expr": "client_manager_queue_error",
+          "legendFormat": "Queue Errors",
+          "refId": "A"
+        }
+      ],
+      "title": "Queue Errors",
+      "type": "gauge"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 6, "y": 4},
+      "id": 6,
+      "options": {"legend": {"calcs": ["last"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {"expr": "client_manager_queue_pending", "legendFormat": "Pending", "refId": "A"},
+        {"expr": "client_manager_queue_sending", "legendFormat": "Sending", "refId": "B"},
+        {"expr": "client_manager_queue_sent", "legendFormat": "Sent", "refId": "C"},
+        {"expr": "client_manager_queue_error", "legendFormat": "Error", "refId": "D"}
+      ],
+      "title": "Message Queue History",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 18, "y": 4},
+      "id": 7,
+      "options": {"legend": {"calcs": ["last"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {"expr": "client_manager_clients_active", "legendFormat": "Active Clients", "refId": "A"},
+        {"expr": "client_manager_clients_expired", "legendFormat": "Expired Clients", "refId": "B"}
+      ],
+      "title": "Client Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "seconds"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 12},
+      "id": 8,
+      "options": {"legend": {"calcs": ["last"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {"expr": "client_manager_uptime_seconds", "legendFormat": "Uptime", "refId": "A"}
+      ],
+      "title": "Uptime (seconds)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 12},
+      "id": 9,
+      "options": {"legend": {"calcs": ["last"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {"expr": "client_manager_memory_usage_bytes{type=\"rss\"}", "legendFormat": "RSS", "refId": "A"},
+        {"expr": "client_manager_memory_usage_bytes{type=\"heapUsed\"}", "legendFormat": "Heap Used", "refId": "B"},
+        {"expr": "client_manager_memory_usage_bytes{type=\"heapTotal\"}", "legendFormat": "Heap Total", "refId": "C"}
+      ],
+      "title": "Memory Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 50},
+              {"color": "red", "value": 100}
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 12},
+      "id": 10,
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {"expr": "client_manager_memory_usage_bytes{type=\"heapUsed\"} / client_manager_memory_usage_bytes{type=\"heapTotal\"} * 100", "legendFormat": "Heap Usage %", "refId": "A"}
+      ],
+      "title": "Heap Usage %",
+      "type": "gauge"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["client-manager", "whatsapp", "queue", "monitoring"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "Client Manager - System Monitoring",
+  "uid": "client-manager",
+  "version": 1,
+  "weekStart": ""
+}
