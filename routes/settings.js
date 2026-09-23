@@ -29,10 +29,10 @@ module.exports = (waService, io) => {
       post_expiry_schedule_enabled,
       recovery_schedule_hour,
       recovery_schedule_minute,
-      recovery_schedule_enabled
+      recovery_schedule_enabled,
     } = req.body;
     const upsert = db.prepare(
-      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
     );
     if (reminder_days_before !== undefined) upsert.run('reminder_days_before', String(reminder_days_before));
     if (reminder_message_template !== undefined) upsert.run('reminder_message_template', reminder_message_template);

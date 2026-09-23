@@ -10,8 +10,9 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const { Server } = require('socket.io');
 
+const { logger } = require('./lib/logger');
 const WhatsAppService = require('./services/whatsapp');
-const MessageQueue = require('./services/messageQueue');
+const { MessageQueue } = require('./services/messageQueue');
 const { startScheduler, restartScheduler, runReminderCheck } = require('./services/scheduler');
 const { startAutoBackup } = require('./services/backup');
 const { authMiddleware, JWT_SECRET } = require('./middleware/auth');
@@ -20,10 +21,10 @@ const jwt = require('jsonwebtoken');
 // Handlers globais para erros assíncronos do Baileys/WhatsApp.
 // Sem eles, uma única rejeição não tratada derruba o processo inteiro.
 process.on('unhandledRejection', (reason) => {
-  console.error('[process] unhandledRejection:', reason && reason.stack ? reason.stack : reason);
+  logger.error({ reason: reason && reason.stack ? reason.stack : reason }, 'unhandledRejection');
 });
 process.on('uncaughtException', (err) => {
-  console.error('[process] uncaughtException:', err && err.stack ? err.stack : err);
+  logger.error({ err: err && err.stack ? err.stack : err }, 'uncaughtException');
 });
 
 const app = express();
@@ -32,7 +33,7 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3400;
 
 if (!process.env.CORS_ORIGIN) {
-  console.error('[server] ERRO CRÍTICO: CORS_ORIGIN não definido no ambiente. Encerrando.');
+  logger.error({ component: 'server' }, 'ERRO CRÍTICO: CORS_ORIGIN não definido no ambiente. Encerrando.');
   process.exit(1);
 }
 const CORS_ORIGIN = process.env.CORS_ORIGIN;
@@ -42,9 +43,9 @@ app.set('trust proxy', 1);
 const io = new Server(server, {
   cors: {
     origin: CORS_ORIGIN,
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
 
 // Autenticação do Socket.IO: exige o mesmo JWT usado na API (via cookie ou handshake.auth.token).
@@ -74,8 +75,8 @@ app.use(helmet({
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
-    preload: true
-  }
+    preload: true,
+  },
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
@@ -99,7 +100,7 @@ const generalLimiter = rateLimit({
   max: 120,
   message: { error: 'Muitas requisições. Tente novamente em 1 minuto.' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
 });
 
 // Rate limiting - login (mais restritivo)
@@ -108,7 +109,7 @@ const loginLimiter = rateLimit({
   max: 5,
   message: { error: 'Muitas tentativas de login. Aguarde 1 minuto.' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
 });
 
 app.use('/api/', generalLimiter);
@@ -147,7 +148,7 @@ app.get('/healthz', (req, res) => {
     status: healthy ? 'healthy' : 'unhealthy',
     whatsapp: waStatus.status,
     database: dbOk ? 'ok' : 'error',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -176,7 +177,7 @@ app.post('/api/reminders/run-now', async (req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
-  console.error(`[error] ${err.name}: ${err.message}`);
+  logger.error({ err: { name: err.name, message: err.message, stack: err.stack }, path: req.path, method: req.method }, 'Request error');
   res.status(statusCode).json({ error: err.message });
 });
 
@@ -186,10 +187,10 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
-  console.log(`\n  Client Manager rodando em http://${process.env.HOST || '0.0.0.0'}:${PORT}\n`);
+  logger.info({ component: 'server', port: PORT, host: process.env.HOST || '0.0.0.0' }, 'Client Manager rodando');
   startScheduler(waService, io, messageQueue);
   startAutoBackup();
   messageQueue.start();
   // Reconecta o WhatsApp automaticamente após qualquer reinício do app/container.
-  waService.connect().catch(err => console.error('[whatsapp] Falha ao conectar no startup:', err.message));
+  waService.connect().catch(err => logger.error({ err: err.message, component: 'whatsapp' }, 'Falha ao conectar no startup'));
 });

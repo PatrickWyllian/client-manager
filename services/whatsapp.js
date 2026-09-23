@@ -3,7 +3,7 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  Browsers
+  Browsers,
 } = require('@whiskeysockets/baileys');
 const { proto } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
@@ -48,7 +48,7 @@ class WhatsAppService {
       qr: this.qrDataUrl,
       phoneNumber: this.phoneNumber,
       disconnectCount: this.disconnectCount,
-      lastStatusCode: this.lastStatusCode
+      lastStatusCode: this.lastStatusCode,
     });
   }
 
@@ -90,7 +90,7 @@ class WhatsAppService {
         browser: Browsers.ubuntu('Chrome'),
         auth: state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false
+        printQRInTerminal: false,
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -232,7 +232,7 @@ class WhatsAppService {
       disconnectCount: this.disconnectCount,
       lastStatusCode: this.lastStatusCode,
       pendingAcks: this.pendingAcks.size,
-      socketUsable: this.isSocketUsable()
+      socketUsable: this.isSocketUsable(),
     };
   }
 

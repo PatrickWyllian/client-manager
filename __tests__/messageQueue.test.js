@@ -1,4 +1,4 @@
-const MessageQueue = require('../services/messageQueue');
+const { MessageQueue } = require('../services/messageQueue');
 const EventEmitter = require('events');
 
 // Mock simples do waService
@@ -41,7 +41,7 @@ describe('MessageQueue', () => {
 
   test('enqueue deve emitir evento queue:added', () => {
     const emitSpy = jest.spyOn(messageQueue, 'emit');
-    messageQueue.enqueue('5521972872889', 'Teste', 'manual', 1, 1);
+    messageQueue.enqueue('5521972872889', 'Teste', 'manual', null, 1);
     expect(emitSpy).toHaveBeenCalledWith('queue:added', expect.objectContaining({
       id: expect.any(Number),
       phone: '5521972872889',

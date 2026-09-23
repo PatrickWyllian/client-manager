@@ -72,7 +72,7 @@ class MessageQueue extends EventEmitter {
     }
 
     const pending = db.prepare(
-      "SELECT * FROM message_queue WHERE status = 'pending' ORDER BY priority DESC, created_at ASC LIMIT 1"
+      'SELECT * FROM message_queue WHERE status = \'pending\' ORDER BY priority DESC, created_at ASC LIMIT 1',
     ).get();
 
     if (!pending) {
@@ -86,7 +86,7 @@ class MessageQueue extends EventEmitter {
 
     // Marca como 'sending' para não re-pescar a mesma mensagem enquanto enviamos
     db.prepare(
-      "UPDATE message_queue SET status = 'sending' WHERE id = ?"
+      'UPDATE message_queue SET status = \'sending\' WHERE id = ?',
     ).run(pending.id);
 
     let nextDelayMs = this.defaultIntervalMs;
@@ -95,7 +95,7 @@ class MessageQueue extends EventEmitter {
       if (this.waService.getStatus().status !== 'connected') {
         // Devolve para 'pending' e tenta de novo em instantes
         db.prepare(
-          "UPDATE message_queue SET status = 'pending' WHERE id = ?"
+          'UPDATE message_queue SET status = \'pending\' WHERE id = ?',
         ).run(pending.id);
         this.processing = false;
         this.timer = setTimeout(() => this._processNext(), 10000);
@@ -110,13 +110,13 @@ class MessageQueue extends EventEmitter {
       await this.waService.sendMessage(pending.phone, finalMessage);
 
       db.prepare(
-        "UPDATE message_queue SET status = 'sent', sent_at = datetime('now', 'localtime'), attempts = COALESCE(attempts, 0) + 1 WHERE id = ?"
+        'UPDATE message_queue SET status = \'sent\', sent_at = datetime(\'now\', \'localtime\'), attempts = COALESCE(attempts, 0) + 1 WHERE id = ?',
       ).run(pending.id);
 
       // Registra a notificação somente após o envio CONFIRMADO,
       // para que a cron não re-envie (e sem dar falso "enviada" antes da hora).
       if (pending.client_id) {
-        const client = db.prepare("SELECT due_date FROM clients WHERE id = ?").get(pending.client_id);
+        const client = db.prepare('SELECT due_date FROM clients WHERE id = ?').get(pending.client_id);
         if (client) recordNotification(pending.client_id, client.due_date, pending.type);
       }
 
@@ -127,7 +127,7 @@ class MessageQueue extends EventEmitter {
         // Buscar nome do cliente se tiver client_id
         let clientName = pending.phone;
         if (pending.client_id) {
-          const client = db.prepare("SELECT name FROM clients WHERE id = ?").get(pending.client_id);
+          const client = db.prepare('SELECT name FROM clients WHERE id = ?').get(pending.client_id);
           if (client) clientName = client.name;
         }
         this.io.emit('wa:message-sent', {
@@ -135,7 +135,7 @@ class MessageQueue extends EventEmitter {
           client_id: pending.client_id,
           clientName,
           phone: pending.phone,
-          type: pending.type
+          type: pending.type,
         });
         this.io.emit('wa:queue-update', this.getQueueStatus());
       }
@@ -147,13 +147,13 @@ class MessageQueue extends EventEmitter {
       // Envio não confirmado: tenta de novo (com limite), sem dar falso "enviada".
       if (attempts < MAX_ATTEMPTS) {
         db.prepare(
-          "UPDATE message_queue SET status = 'pending', attempts = ? WHERE id = ?"
+          'UPDATE message_queue SET status = \'pending\', attempts = ? WHERE id = ?',
         ).run(attempts, pending.id);
         this.logger.warn({ attempts, maxAttempts: MAX_ATTEMPTS, phone: pending.phone }, 'Reenfileirando');
         this.emit('queue:requeued', { ...pending, attempts });
       } else {
         db.prepare(
-          "UPDATE message_queue SET status = 'error', error = ?, attempts = ? WHERE id = ?"
+          'UPDATE message_queue SET status = \'error\', error = ?, attempts = ? WHERE id = ?',
         ).run(err.message, attempts, pending.id);
 
         this.emit('queue:error', { ...pending, error: err.message });
@@ -161,7 +161,7 @@ class MessageQueue extends EventEmitter {
         if (this.io) {
           let clientName = pending.phone;
           if (pending.client_id) {
-            const client = db.prepare("SELECT name FROM clients WHERE id = ?").get(pending.client_id);
+            const client = db.prepare('SELECT name FROM clients WHERE id = ?').get(pending.client_id);
             if (client) clientName = client.name;
           }
           this.io.emit('wa:message-error', {
@@ -170,7 +170,7 @@ class MessageQueue extends EventEmitter {
             clientName,
             phone: pending.phone,
             type: pending.type,
-            error: err.message
+            error: err.message,
           });
           this.io.emit('wa:queue-update', this.getQueueStatus());
         }
@@ -179,7 +179,7 @@ class MessageQueue extends EventEmitter {
       this.processing = false;
       const isCron = pending.type === 'reminder' || pending.type === 'recovery' || pending.type === 'post_expiry';
       const baseDelay = isCron ? this.cronIntervalMs : this.defaultIntervalMs;
-      
+
       // Jitter humano: variação aleatória entre 15s e 45s
       const jitterMs = Math.floor(Math.random() * (45000 - 15000 + 1)) + 15000;
       nextDelayMs = baseDelay + jitterMs;
@@ -190,7 +190,7 @@ class MessageQueue extends EventEmitter {
 
   enqueue(phone, message, type = 'manual', clientId = null, priority = 0) {
     const result = db.prepare(
-      "INSERT INTO message_queue (client_id, phone, message, type, priority, scheduled_at) VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))"
+      'INSERT INTO message_queue (client_id, phone, message, type, priority, scheduled_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))',
     ).run(clientId, phone, message, type, priority);
 
     this.emit('queue:added', { id: result.lastInsertRowid, phone, message, type });
@@ -206,7 +206,7 @@ class MessageQueue extends EventEmitter {
 
   cancel(id) {
     db.prepare(
-      "UPDATE message_queue SET status = 'cancelled' WHERE id = ? AND status IN ('pending', 'sending')"
+      'UPDATE message_queue SET status = \'cancelled\' WHERE id = ? AND status IN (\'pending\', \'sending\')',
     ).run(id);
 
     this.emit('queue:cancelled', id);
@@ -218,7 +218,7 @@ class MessageQueue extends EventEmitter {
 
   forceCancel(id) {
     db.prepare(
-      "UPDATE message_queue SET status = 'cancelled' WHERE id = ? AND status NOT IN ('sent', 'cancelled', 'error')"
+      'UPDATE message_queue SET status = \'cancelled\' WHERE id = ? AND status NOT IN (\'sent\', \'cancelled\', \'error\')',
     ).run(id);
 
     this.emit('queue:cancelled', id);
@@ -230,7 +230,7 @@ class MessageQueue extends EventEmitter {
 
   cancelAll() {
     db.prepare(
-      "UPDATE message_queue SET status = 'cancelled' WHERE status IN ('pending', 'sending')"
+      'UPDATE message_queue SET status = \'cancelled\' WHERE status IN (\'pending\', \'sending\')',
     ).run();
 
     this.emit('queue:cleared');
@@ -242,11 +242,11 @@ class MessageQueue extends EventEmitter {
 
   getQueueStatus() {
     const pending = db.prepare(
-      "SELECT COUNT(*) as count FROM message_queue WHERE status = 'pending'"
+      'SELECT COUNT(*) as count FROM message_queue WHERE status = \'pending\'',
     ).get();
 
     const processing = db.prepare(
-      "SELECT * FROM message_queue WHERE status IN ('pending', 'sending') ORDER BY priority DESC, created_at ASC LIMIT 1"
+      'SELECT * FROM message_queue WHERE status IN (\'pending\', \'sending\') ORDER BY priority DESC, created_at ASC LIMIT 1',
     ).get();
 
     const stats = db.prepare(`
@@ -261,7 +261,7 @@ class MessageQueue extends EventEmitter {
       stats: stats.reduce((acc, s) => { acc[s.status] = s.count; return acc; }, {}),
       defaultIntervalMs: this.defaultIntervalMs,
       cronIntervalMs: this.cronIntervalMs,
-      processing: this.processing
+      processing: this.processing,
     };
   }
 
@@ -289,7 +289,7 @@ class MessageQueue extends EventEmitter {
 
   clearHistory() {
     db.prepare(
-      "DELETE FROM message_queue WHERE status IN ('sent', 'error', 'cancelled')"
+      'DELETE FROM message_queue WHERE status IN (\'sent\', \'error\', \'cancelled\')',
     ).run();
 
     if (this.io) {
@@ -298,7 +298,4 @@ class MessageQueue extends EventEmitter {
   }
 }
 
-module.exports = {
-  MessageQueue,
-  parseSpintax
-};
+module.exports = MessageQueue;

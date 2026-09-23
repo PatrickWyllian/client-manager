@@ -39,7 +39,7 @@ module.exports = (waService) => {
       return {
         ...rest,
         has_password: hasPassword,
-        days_until_due: daysUntil(c.due_date)
+        days_until_due: daysUntil(c.due_date),
       };
     });
 
@@ -59,7 +59,7 @@ module.exports = (waService) => {
       res.json({
         ...client,
         password: client.password ? decryptText(client.password) : null,
-        days_until_due: daysUntil(client.due_date)
+        days_until_due: daysUntil(client.due_date),
       });
     } catch (err) {
       next(err);
@@ -80,7 +80,7 @@ module.exports = (waService) => {
       // Transação atômica
       const createTransaction = db.transaction(() => {
         const createStatus = status || 'ativo';
-        const nowTs = db.prepare("SELECT datetime('now', 'localtime') t").get().t;
+        const nowTs = db.prepare('SELECT datetime(\'now\', \'localtime\') t').get().t;
         const createdExpiredAt = createStatus === 'expirado' ? nowTs : null;
         const createdCancelledAt = createStatus === 'cancelado' ? nowTs : null;
         const stmt = db.prepare(`
@@ -100,7 +100,7 @@ module.exports = (waService) => {
           createdCancelledAt,
           username || null,
           encPassword,
-          notes || null
+          notes || null,
         );
 
         const clientId = info.lastInsertRowid;
@@ -108,7 +108,7 @@ module.exports = (waService) => {
         // Registrar venda
         const saleValue = (price || 0) - (discount || 0);
         if (saleValue > 0) {
-          db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'novo', ?, date('now'))")
+          db.prepare('INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, \'novo\', ?, date(\'now\'))')
             .run(clientId, saleValue);
         }
 
@@ -137,7 +137,7 @@ module.exports = (waService) => {
 
       res.status(201).json({
         ...client,
-        password: password || null
+        password: password || null,
       });
     } catch (err) {
       next(err);
@@ -151,13 +151,13 @@ module.exports = (waService) => {
       if (!existing) throw new NotFoundError('Cliente não encontrado.');
 
       const { name, phone, plan, price, discount, server_id, due_date, status, username, password, notes } = req.body;
-      
+
       const encPassword = password !== undefined
         ? (password ? encryptText(password.trim()) : null)
         : existing.password;
 
       const newStatus = status ?? existing.status;
-      const nowTs = db.prepare("SELECT datetime('now', 'localtime') t").get().t;
+      const nowTs = db.prepare('SELECT datetime(\'now\', \'localtime\') t').get().t;
       let expiredAt = existing.expired_at || null;
       let cancelledAt = existing.cancelled_at || null;
       if (newStatus === 'expirado') {
@@ -187,12 +187,12 @@ module.exports = (waService) => {
         notes ?? existing.notes,
         expiredAt,
         cancelledAt,
-        req.params.id
+        req.params.id,
       );
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
       res.json({
         ...updated,
-        password: updated.password ? decryptText(updated.password) : null
+        password: updated.password ? decryptText(updated.password) : null,
       });
     } catch (err) {
       next(err);
@@ -227,9 +227,9 @@ module.exports = (waService) => {
 
       // Transação Atômica ACID
       const renewTransaction = db.transaction(() => {
-        db.prepare("UPDATE clients SET due_date = ?, status = 'ativo', expired_at = NULL, cancelled_at = NULL WHERE id = ?").run(newDue, client.id);
+        db.prepare('UPDATE clients SET due_date = ?, status = \'ativo\', expired_at = NULL, cancelled_at = NULL WHERE id = ?').run(newDue, client.id);
         if (renewValue > 0) {
-          db.prepare("INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, 'renovacao', ?, ?)")
+          db.prepare('INSERT INTO sales (client_id, type, value, sale_date) VALUES (?, \'renovacao\', ?, ?)')
             .run(client.id, renewValue, renewal_date);
         }
       });
@@ -256,7 +256,7 @@ module.exports = (waService) => {
       res.json({
         ...updated,
         password: updated.password ? decryptText(updated.password) : null,
-        days_until_due: daysUntil(updated.due_date)
+        days_until_due: daysUntil(updated.due_date),
       });
     } catch (err) {
       next(err);

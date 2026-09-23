@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 
 function runSeed() {
   const upsertSetting = db.prepare(
-    "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)"
+    'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
   );
   upsertSetting.run('welcome_message_template',
     'Olá {nome}! Seja bem-vindo(a)!\n\nSeu acesso foi liberado com sucesso:\n\n📺 Plano: {plano}\n🖥️ Servidor: {servidor}\n👤 Usuário: {usuario}\n🔒 Senha: {senha}\n📅 Vencimento: {vencimento}\n💰 Valor: {valor}\n\nQualquer dúvida, estou à disposição!');
@@ -26,9 +26,9 @@ function runSeed() {
   upsertSetting.run('post_expiry_message_template',
     'Olá {nome}! Tudo bem? Seu plano {servidor} expirou há {dias_vencidos} dia(s). Sentimos sua falta! 😊\n\nQue tal renovar e continuar aproveitando? Estou aqui para te ajudar!\n\n📅 Vencimento: {vencimento}\n👤 Usuário: {usuario}\n\nResponda esta mensagem para renovar!');
 
-  const planCount = db.prepare("SELECT COUNT(*) c FROM plans").get().c;
+  const planCount = db.prepare('SELECT COUNT(*) c FROM plans').get().c;
   if (planCount === 0) {
-    const insertPlan = db.prepare("INSERT INTO plans (name, price, duration_months) VALUES (?, ?, ?)");
+    const insertPlan = db.prepare('INSERT INTO plans (name, price, duration_months) VALUES (?, ?, ?)');
     insertPlan.run('Mensal', 35, 1);
     insertPlan.run('Trimestral', 90, 3);
     insertPlan.run('Semestral', 160, 6);
@@ -37,12 +37,12 @@ function runSeed() {
     console.log('[db] Seed: planos padrão criados');
   } else {
     const defaultPrices = { 'Mensal': 35, 'Trimestral': 90, 'Semestral': 160, 'Anual': 300, 'Promocional': 25 };
-    const updatePrice = db.prepare("UPDATE plans SET price = ? WHERE name = ? AND price = 0");
+    const updatePrice = db.prepare('UPDATE plans SET price = ? WHERE name = ? AND price = 0');
     for (const [name, price] of Object.entries(defaultPrices)) {
       updatePrice.run(price, name);
     }
-    if (!db.prepare("SELECT id FROM plans WHERE name = 'Promocional'").get()) {
-      db.prepare("INSERT INTO plans (name, price, duration_months) VALUES (?, ?, ?)").run('Promocional', 25, 1);
+    if (!db.prepare('SELECT id FROM plans WHERE name = \'Promocional\'').get()) {
+      db.prepare('INSERT INTO plans (name, price, duration_months) VALUES (?, ?, ?)').run('Promocional', 25, 1);
     }
   }
 

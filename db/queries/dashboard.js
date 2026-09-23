@@ -1,11 +1,11 @@
 const db = require('../connection');
 
 function getActiveClientsCount() {
-  return db.prepare("SELECT COUNT(*) c FROM clients WHERE status = 'ativo'").get().c;
+  return db.prepare('SELECT COUNT(*) c FROM clients WHERE status = \'ativo\'').get().c;
 }
 
 function getActiveServersCount() {
-  return db.prepare("SELECT COUNT(*) c FROM servers WHERE status = 'ativo'").get().c;
+  return db.prepare('SELECT COUNT(*) c FROM servers WHERE status = \'ativo\'').get().c;
 }
 
 function getMonthlyRecurringRevenue() {
@@ -92,7 +92,7 @@ function getExpiredClients(limit = 10) {
 }
 
 function getExpiredCount() {
-  return db.prepare("SELECT COUNT(*) c FROM clients WHERE status = 'expirado'").get().c;
+  return db.prepare('SELECT COUNT(*) c FROM clients WHERE status = \'expirado\'').get().c;
 }
 
 function getExpiredRevenue() {
@@ -170,7 +170,7 @@ function getMonthlyProfitHistory(monthsBack) {
       totalRenewals: Math.round(totals.totalRenewals * 100) / 100,
       countRenewals: totals.countRenewals,
       serverCost: Math.round(serverCost * 100) / 100,
-      netProfit: Math.round(netProfit * 100) / 100
+      netProfit: Math.round(netProfit * 100) / 100,
     });
   }
   return result;
@@ -190,5 +190,5 @@ module.exports = {
   getPlanDistribution,
   getMonthSalesTotals,
   getMonthlyServerCostByMonth,
-  getMonthlyProfitHistory
+  getMonthlyProfitHistory,
 };

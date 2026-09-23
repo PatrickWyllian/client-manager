@@ -107,7 +107,7 @@ module.exports = (waService, messageQueue) => {
       }
 
       const id = messageQueue.enqueue(
-        phone, message, type || 'manual', client_id || null, priority || 0
+        phone, message, type || 'manual', client_id || null, priority || 0,
       );
       res.json({ ok: true, queueId: id });
     } catch (err) {

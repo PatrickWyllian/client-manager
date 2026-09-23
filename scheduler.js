@@ -1,6 +1,10 @@
 const cron = require('node-cron');
 const db = require('../db/database');
 const { daysUntil, daysSince, formatDate } = require('../lib/dateHelpers');
+const { createChildLogger } = require('../lib/logger');
+
+const logger = createChildLogger('scheduler');
+
 let messageQueue = null;
 let scheduledJobs = {};
 
@@ -45,37 +49,37 @@ function startScheduledJobs(waService, io) {
   scheduledJobs.expire = cron.schedule(expireExpr, () => {
     expireOverdueClients();
   });
-  console.log('[scheduler] Expiração automática agendada para 00:05.');
+  logger.info('Expiração automática agendada para 00:05.');
 
   if (schedules.reminder.enabled) {
     const cronExpr = `${schedules.reminder.minute} ${schedules.reminder.hour} * * *`;
     scheduledJobs.reminder = cron.schedule(cronExpr, () => {
       expireOverdueClients();
       runReminderCheck(waService, io).then(result => {
-        console.log('[scheduler] Verificação de vencimentos:', result);
+        logger.info({ result }, 'Verificação de vencimentos');
       });
     });
-    console.log(`[scheduler] Lembrete agendado para ${schedules.reminder.hour}:${String(schedules.reminder.minute).padStart(2, '0')}`);
+    logger.info(`Lembrete agendado para ${schedules.reminder.hour}:${String(schedules.reminder.minute).padStart(2, '0')}`);
   }
 
   if (schedules.recovery.enabled) {
     const cronExpr = `${schedules.recovery.minute} ${schedules.recovery.hour} * * *`;
     scheduledJobs.recovery = cron.schedule(cronExpr, () => {
       runRecoveryCheck(waService, io).then(result => {
-        console.log('[scheduler] Verificação de recuperação:', result);
+        logger.info({ result }, 'Verificação de recuperação');
       });
     });
-    console.log(`[scheduler] Recuperação agendada para ${schedules.recovery.hour}:${String(schedules.recovery.minute).padStart(2, '0')}`);
+    logger.info(`Recuperação agendada para ${schedules.recovery.hour}:${String(schedules.recovery.minute).padStart(2, '0')}`);
   }
 
   if (schedules.post_expiry.enabled) {
     const cronExpr = `${schedules.post_expiry.minute} ${schedules.post_expiry.hour} * * *`;
     scheduledJobs.post_expiry = cron.schedule(cronExpr, () => {
       runPostExpiryCheck(waService, io).then(result => {
-        console.log('[scheduler] Verificação pós-vencimento:', result);
+        logger.info({ result }, 'Verificação pós-vencimento');
       });
     });
-    console.log(`[scheduler] Pós-vencimento agendado para ${schedules.post_expiry.hour}:${String(schedules.post_expiry.minute).padStart(2, '0')}`);
+    logger.info(`Pós-vencimento agendado para ${schedules.post_expiry.hour}:${String(schedules.post_expiry.minute).padStart(2, '0')}`);
   }
 }
 
@@ -90,7 +94,7 @@ function expireOverdueClients() {
     'UPDATE clients SET status = \'expirado\', expired_at = ? WHERE status = \'ativo\' AND due_date < ?',
   ).run(nowTs, today);
   if (result.changes > 0) {
-    console.log(`[scheduler] ${result.changes} cliente(s) expirado(s) automaticamente.`);
+    logger.info({ changes: result.changes }, 'Clientes expirados automaticamente');
   }
   return result.changes;
 }
@@ -202,19 +206,19 @@ async function sendWelcomeMessage(waService, client) {
       await waService.sendMessage(client.phone, message);
       recordNotification(client.id, client.due_date, 'welcome');
     } else {
-      console.log(`[scheduler] WhatsApp desconectado — boas-vindas para ${client.name} enfileirada`);
+      logger.warn({ clientName: client.name }, 'WhatsApp desconectado — boas-vindas enfileirada');
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error(`[scheduler] Falha ao enviar boas-vindas para ${client.name}:`, err.message);
+    logger.error({ clientName: client.name, err: err.message }, 'Falha ao enviar boas-vindas');
     return false;
   }
 }
 
 // --- Verificar lembretes de vencimento ---
-async function runReminderCheck(waService, _io) {
+async function runReminderCheck(waService, io) {
   const reminderDays = parseInt(getSetting('reminder_days_before', '3'), 10);
 
   const clients = db.prepare(`
@@ -248,7 +252,7 @@ async function runReminderCheck(waService, _io) {
       queuedCount++;
       // Log de dedução — o toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
-      console.error(`Falha ao enfileirar mensagem para ${client.name}:`, err.message);
+      logger.error({ clientName: client.name, err: err.message }, 'Falha ao enfileirar mensagem');
     }
   }
 
@@ -256,7 +260,7 @@ async function runReminderCheck(waService, _io) {
 }
 
 // --- Verificação de recuperação (clientes vencidos >N dias) ---
-async function runRecoveryCheck(waService, _io) {
+async function runRecoveryCheck(waService, io) {
   const daysAfterExpiry = parseInt(getSetting('recovery_days_after_expiry', '15'), 10);
   const batchSize = parseInt(getSetting('recovery_batch_size', '5'), 10);
 
@@ -301,10 +305,10 @@ async function runRecoveryCheck(waService, _io) {
         recordNotification(client.id, client.due_date, 'recovery');
       }
       queuedCount++;
-      console.log(`[scheduler] Recuperação enfileirada para ${client.name} (${queuedCount}/${toSend.length})`);
+      logger.info({ clientName: client.name, count: queuedCount, total: toSend.length }, 'Recuperação enfileirada');
       // Toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
-      console.error(`[scheduler] Falha ao enfileirar recuperação para ${client.name}:`, err.message);
+      logger.error({ clientName: client.name, err: err.message }, 'Falha ao enfileirar recuperação');
     }
   }
 
@@ -312,7 +316,7 @@ async function runRecoveryCheck(waService, _io) {
 }
 
 // --- Verificação pós-vencimento (3 dias após expiração) ---
-async function runPostExpiryCheck(waService, _io) {
+async function runPostExpiryCheck(waService, io) {
   const postExpiryDays = parseInt(getSetting('post_expiry_days', '3'), 10);
 
   // Buscar clientes expirados há exatamente N dias
@@ -353,10 +357,10 @@ async function runPostExpiryCheck(waService, _io) {
         recordNotification(client.id, client.due_date, 'post_expiry');
       }
       queuedCount++;
-      console.log(`[scheduler] Pós-vencimento enfileirado para ${client.name} (${queuedCount}/${candidates.length})`);
+      logger.info({ clientName: client.name, count: queuedCount, total: candidates.length }, 'Pós-vencimento enfileirado');
       // Toast "enviada" agora é emitido pela fila (wa:message-sent)
     } catch (err) {
-      console.error(`[scheduler] Falha ao enfileirar pós-vencimento para ${client.name}:`, err.message);
+      logger.error({ clientName: client.name, err: err.message }, 'Falha ao enfileirar pós-vencimento');
     }
   }
 

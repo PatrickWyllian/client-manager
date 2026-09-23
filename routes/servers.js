@@ -34,7 +34,7 @@ router.post('/', (req, res, next) => {
 
     const { name, provider, cost, status, notes } = req.body;
     const stmt = db.prepare(
-      'INSERT INTO servers (name, provider, cost, status, notes) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO servers (name, provider, cost, status, notes) VALUES (?, ?, ?, ?, ?)',
     );
     const info = stmt.run(name.trim(), provider || null, cost || 0, status || 'ativo', notes || null);
     const server = db.prepare('SELECT * FROM servers WHERE id = ?').get(info.lastInsertRowid);
@@ -52,14 +52,14 @@ router.put('/:id', (req, res, next) => {
 
     const { name, provider, cost, status, notes } = req.body;
     db.prepare(
-      'UPDATE servers SET name = ?, provider = ?, cost = ?, status = ?, notes = ? WHERE id = ?'
+      'UPDATE servers SET name = ?, provider = ?, cost = ?, status = ?, notes = ? WHERE id = ?',
     ).run(
       name ?? existing.name,
       provider ?? existing.provider,
       cost ?? existing.cost,
       status ?? existing.status,
       notes ?? existing.notes,
-      req.params.id
+      req.params.id,
     );
     const updated = db.prepare('SELECT * FROM servers WHERE id = ?').get(req.params.id);
     res.json(updated);

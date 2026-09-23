@@ -19,6 +19,7 @@ describe('encryptText / decryptText', () => {
     '1234567890',
     'senha@#$%^&*()',
     'a'.repeat(100), // string longa
+    '', // string vazia
   ];
 
   test('deve encriptar e decriptar corretamente para vários segredos', () => {

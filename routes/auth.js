@@ -26,7 +26,7 @@ router.post('/login', (req, res) => {
     httpOnly: true,
     secure: true, // HTTPS via Traefik
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24h
+    maxAge: 24 * 60 * 60 * 1000, // 24h
   });
 
   res.json({ ok: true, username: user.username });

@@ -1,61 +1,61 @@
 const db = require('./connection');
 
 function runMigrations() {
-  const serverColumns = db.prepare("PRAGMA table_info(servers)").all();
+  const serverColumns = db.prepare('PRAGMA table_info(servers)').all();
   if (!serverColumns.some(c => c.name === 'cost')) {
-    db.exec("ALTER TABLE servers ADD COLUMN cost REAL DEFAULT 0");
+    db.exec('ALTER TABLE servers ADD COLUMN cost REAL DEFAULT 0');
     console.log('[db] Migração: adicionada coluna cost em servers');
   }
 
-  const planColumns = db.prepare("PRAGMA table_info(plans)").all();
+  const planColumns = db.prepare('PRAGMA table_info(plans)').all();
   if (!planColumns.some(c => c.name === 'price')) {
-    db.exec("ALTER TABLE plans ADD COLUMN price REAL DEFAULT 0");
+    db.exec('ALTER TABLE plans ADD COLUMN price REAL DEFAULT 0');
     console.log('[db] Migração: adicionada coluna price em plans');
   }
 
-  const clientColumns = db.prepare("PRAGMA table_info(clients)").all();
+  const clientColumns = db.prepare('PRAGMA table_info(clients)').all();
   if (!clientColumns.some(c => c.name === 'discount')) {
-    db.exec("ALTER TABLE clients ADD COLUMN discount REAL DEFAULT 0");
+    db.exec('ALTER TABLE clients ADD COLUMN discount REAL DEFAULT 0');
     console.log('[db] Migração: adicionada coluna discount em clients');
   }
   if (!clientColumns.some(c => c.name === 'username')) {
-    db.exec("ALTER TABLE clients ADD COLUMN username TEXT");
+    db.exec('ALTER TABLE clients ADD COLUMN username TEXT');
     console.log('[db] Migração: adicionada coluna username em clients');
   }
   if (!clientColumns.some(c => c.name === 'password')) {
-    db.exec("ALTER TABLE clients ADD COLUMN password TEXT");
+    db.exec('ALTER TABLE clients ADD COLUMN password TEXT');
     console.log('[db] Migração: adicionada coluna password em clients');
   }
   if (!clientColumns.some(c => c.name === 'expired_at')) {
-    db.exec("ALTER TABLE clients ADD COLUMN expired_at TEXT");
+    db.exec('ALTER TABLE clients ADD COLUMN expired_at TEXT');
     console.log('[db] Migração: adicionada coluna expired_at em clients');
   }
   if (!clientColumns.some(c => c.name === 'cancelled_at')) {
-    db.exec("ALTER TABLE clients ADD COLUMN cancelled_at TEXT");
+    db.exec('ALTER TABLE clients ADD COLUMN cancelled_at TEXT');
     console.log('[db] Migração: adicionada coluna cancelled_at em clients');
   }
 
   // Backfill idempotente: preenche timestamps de transição para linhas pré-existentes
   // (aproximação documentada: usa due_date como data da baixa).
   const backfillExpired = db.prepare(
-    "UPDATE clients SET expired_at = due_date WHERE status = 'expirado' AND expired_at IS NULL"
+    'UPDATE clients SET expired_at = due_date WHERE status = \'expirado\' AND expired_at IS NULL',
   ).run();
   if (backfillExpired.changes > 0) {
     console.log(`[db] Backfill: ${backfillExpired.changes} cliente(s) expirado(s) com expired_at = due_date`);
   }
   const backfillCancelled = db.prepare(
-    "UPDATE clients SET cancelled_at = due_date WHERE status = 'cancelado' AND cancelled_at IS NULL"
+    'UPDATE clients SET cancelled_at = due_date WHERE status = \'cancelado\' AND cancelled_at IS NULL',
   ).run();
   if (backfillCancelled.changes > 0) {
     console.log(`[db] Backfill: ${backfillCancelled.changes} cliente(s) cancelado(s) com cancelled_at = due_date`);
   }
 
-  const planColumns2 = db.prepare("PRAGMA table_info(plans)").all();
+  const planColumns2 = db.prepare('PRAGMA table_info(plans)').all();
   if (!planColumns2.some(c => c.name === 'screens')) {
-    db.exec("ALTER TABLE plans ADD COLUMN screens INTEGER NOT NULL DEFAULT 1");
+    db.exec('ALTER TABLE plans ADD COLUMN screens INTEGER NOT NULL DEFAULT 1');
     console.log('[db] Migração: adicionada coluna screens em plans');
 
-    const allPlans = db.prepare("SELECT id, name FROM plans").all();
+    const allPlans = db.prepare('SELECT id, name FROM plans').all();
     for (const p of allPlans) {
       let screens = 1;
       const n = p.name.toLowerCase();
@@ -63,14 +63,14 @@ function runMigrations() {
       else if (n.includes('três telas') || n.includes('3 telas')) screens = 3;
       else if (n.includes('duas telas') || n.includes('2 telas')) screens = 2;
       if (screens > 1) {
-        db.prepare("UPDATE plans SET screens = ? WHERE id = ?").run(screens, p.id);
+        db.prepare('UPDATE plans SET screens = ? WHERE id = ?').run(screens, p.id);
       }
     }
   }
 
-  const notifColumns = db.prepare("PRAGMA table_info(notifications_log)").all();
+  const notifColumns = db.prepare('PRAGMA table_info(notifications_log)').all();
   if (!notifColumns.some(c => c.name === 'type')) {
-    db.exec("ALTER TABLE notifications_log ADD COLUMN type TEXT DEFAULT 'reminder'");
+    db.exec('ALTER TABLE notifications_log ADD COLUMN type TEXT DEFAULT \'reminder\'');
     console.log('[db] Migração: adicionada coluna type em notifications_log');
   }
 
@@ -104,9 +104,9 @@ function runMigrations() {
     )
   `);
 
-  const mqColumns = db.prepare("PRAGMA table_info(message_queue)").all();
+  const mqColumns = db.prepare('PRAGMA table_info(message_queue)').all();
   if (!mqColumns.some(c => c.name === 'attempts')) {
-    db.exec("ALTER TABLE message_queue ADD COLUMN attempts INTEGER DEFAULT 0");
+    db.exec('ALTER TABLE message_queue ADD COLUMN attempts INTEGER DEFAULT 0');
     console.log('[db] Migração: adicionada coluna attempts em message_queue');
   }
 

@@ -1,6 +1,6 @@
 const express = require('express');
-const router  = express.Router();
-const db      = require('../db/database');
+const router = express.Router();
+const db = require('../db/database');
 const { formatDate, formatMonth } = require('../lib/dateHelpers');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ router.get('/', (req, res) => {
 
   const result = resellers.map(r => ({
     ...r,
-    net_profit: r.total_revenue - r.total_cost
+    net_profit: r.total_revenue - r.total_cost,
   }));
 
   res.json(result);
@@ -49,7 +49,7 @@ router.post('/', (req, res) => {
   if (!name || !name.trim()) return badReq(res, 'O nome do revendedor é obrigatório.');
 
   const info = db.prepare(
-    'INSERT INTO resellers (name, phone, email, notes, status) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO resellers (name, phone, email, notes, status) VALUES (?, ?, ?, ?, ?)',
   ).run(name.trim(), phone || null, email || null, notes || null, status || 'ativo');
 
   const created = db.prepare('SELECT * FROM resellers WHERE id = ?').get(info.lastInsertRowid);
@@ -63,14 +63,14 @@ router.put('/:id', (req, res) => {
 
   const { name, phone, email, notes, status } = req.body;
   db.prepare(
-    'UPDATE resellers SET name = ?, phone = ?, email = ?, notes = ?, status = ? WHERE id = ?'
+    'UPDATE resellers SET name = ?, phone = ?, email = ?, notes = ?, status = ? WHERE id = ?',
   ).run(
     name ?? existing.name,
     phone ?? existing.phone,
     email ?? existing.email,
     notes ?? existing.notes,
     status ?? existing.status,
-    req.params.id
+    req.params.id,
   );
 
   res.json(db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id));
@@ -104,14 +104,14 @@ router.get('/purchases/all', (req, res) => {
   const params = [];
 
   if (month) {
-    query += ` AND strftime('%Y-%m', p.purchase_date) = ?`;
+    query += ' AND strftime(\'%Y-%m\', p.purchase_date) = ?';
     params.push(month);
   }
   if (reseller_id) {
-    query += ` AND p.reseller_id = ?`;
+    query += ' AND p.reseller_id = ?';
     params.push(reseller_id);
   }
-  query += ` ORDER BY p.purchase_date DESC, p.created_at DESC`;
+  query += ' ORDER BY p.purchase_date DESC, p.created_at DESC';
 
   const purchases = db.prepare(query).all(...params);
   res.json(purchases);
@@ -131,10 +131,10 @@ router.get('/:id/purchases', (req, res) => {
   const params = [req.params.id];
 
   if (month) {
-    query += ` AND strftime('%Y-%m', p.purchase_date) = ?`;
+    query += ' AND strftime(\'%Y-%m\', p.purchase_date) = ?';
     params.push(month);
   }
-  query += ` ORDER BY p.purchase_date DESC`;
+  query += ' ORDER BY p.purchase_date DESC';
 
   res.json(db.prepare(query).all(...params));
 });
@@ -143,7 +143,7 @@ router.get('/:id/purchases', (req, res) => {
 router.post('/purchases', (req, res) => {
   const { reseller_id, server_id, credits_qty, amount_paid, cost_per_credit, purchase_date, notes } = req.body;
 
-  if (!reseller_id)    return badReq(res, 'Revendedor é obrigatório.');
+  if (!reseller_id) return badReq(res, 'Revendedor é obrigatório.');
   if (!credits_qty || credits_qty <= 0) return badReq(res, 'Quantidade de créditos deve ser maior que zero.');
   if (amount_paid == null || amount_paid < 0) return badReq(res, 'Valor pago é obrigatório.');
   if (cost_per_credit == null || cost_per_credit < 0) return badReq(res, 'Custo por crédito é obrigatório.');
@@ -162,7 +162,7 @@ router.post('/purchases', (req, res) => {
     parseFloat(amount_paid),
     parseFloat(cost_per_credit),
     purchase_date || formatDate(new Date()),
-    notes || null
+    notes || null,
   );
 
   const created = db.prepare(`
@@ -195,7 +195,7 @@ router.put('/purchases/:id', (req, res) => {
     cost_per_credit != null ? parseFloat(cost_per_credit) : existing.cost_per_credit,
     purchase_date ?? existing.purchase_date,
     notes ?? existing.notes,
-    req.params.id
+    req.params.id,
   );
 
   const updated = db.prepare(`
@@ -239,7 +239,7 @@ router.get('/report/history', (req, res) => {
   const result = rows.map(r => ({
     ...r,
     net_profit: r.total_revenue - r.total_cost,
-    margin_pct: r.total_revenue > 0 ? ((r.total_revenue - r.total_cost) / r.total_revenue * 100).toFixed(1) : '0.0'
+    margin_pct: r.total_revenue > 0 ? ((r.total_revenue - r.total_cost) / r.total_revenue * 100).toFixed(1) : '0.0',
   }));
 
   res.json(result);
@@ -290,7 +290,7 @@ router.get('/report/summary', (req, res) => {
   const byResellerFull = byReseller.map(r => ({
     ...r,
     net_profit: r.revenue - r.cost,
-    margin_pct: r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100).toFixed(1) : '0.0'
+    margin_pct: r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100).toFixed(1) : '0.0',
   }));
 
   res.json({ month, kpis, byReseller: byResellerFull });

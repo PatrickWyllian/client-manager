@@ -45,7 +45,7 @@ describe('validateClient', () => {
     const result = validateClient({
       name: 'João Silva',
       phone: '21972872889',
-      due_date: '2026-12-31'
+      due_date: '2026-12-31',
     });
     expect(result.valid).toBe(true);
   });
@@ -53,7 +53,7 @@ describe('validateClient', () => {
   test('deve rejeitar cliente sem nome', () => {
     const result = validateClient({
       phone: '21972872889',
-      due_date: '2026-12-31'
+      due_date: '2026-12-31',
     });
     expect(result.valid).toBe(false);
     expect(result.error).toBe('Nome é obrigatório.');
@@ -62,7 +62,7 @@ describe('validateClient', () => {
   test('deve rejeitar cliente sem telefone', () => {
     const result = validateClient({
       name: 'João Silva',
-      due_date: '2026-12-31'
+      due_date: '2026-12-31',
     });
     expect(result.valid).toBe(false);
     expect(result.error).toBe('Telefone é obrigatório.');
@@ -71,7 +71,7 @@ describe('validateClient', () => {
   test('deve rejeitar cliente sem data de vencimento', () => {
     const result = validateClient({
       name: 'João Silva',
-      phone: '21972872889'
+      phone: '21972872889',
     });
     expect(result.valid).toBe(false);
     expect(result.error).toBe('Data de vencimento é obrigatória.');

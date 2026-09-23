@@ -3,7 +3,7 @@ const { daysUntil, daysSince, formatDate, formatMonth, addMonthsPreservingDay } 
 describe('daysUntil', () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   test('deve retornar 0 para hoje', () => {
     const todayStr = today.toISOString().split('T')[0];
     expect(daysUntil(todayStr)).toBe(0);
@@ -27,7 +27,7 @@ describe('daysUntil', () => {
 describe('daysSince', () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   test('deve retornar 0 para hoje', () => {
     const todayStr = today.toISOString().split('T')[0];
     expect(daysSince(todayStr)).toBe(0);

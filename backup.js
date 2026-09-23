@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const db = require('../db/database');
+const { createChildLogger } = require('../lib/logger');
+
+const logger = createChildLogger('backup');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'iptv-crm.db');
 const BACKUP_DIR = path.join(__dirname, '..', 'data', 'backups');
@@ -24,14 +27,14 @@ function runBackup() {
     // SQLite backup command safely via better-sqlite3 API
     db.backup(targetPath)
       .then(() => {
-        console.log(`[backup] Backup realizado com sucesso: ${backupFileName}`);
+        logger.info({ backupFile: backupFileName }, 'Backup realizado com sucesso');
         cleanOldBackups(30); // Keep last 30 backups
       })
       .catch((err) => {
-        console.error('[backup] Erro durante o backup:', err.message);
+        logger.error({ err: err.message }, 'Erro durante o backup');
       });
   } catch (err) {
-    console.error('[backup] Erro ao iniciar backup:', err.message);
+    logger.error({ err: err.message }, 'Erro ao iniciar backup');
   }
 }
 
@@ -50,17 +53,17 @@ function cleanOldBackups(maxKeep = 30) {
       }
     }
   } catch (err) {
-    console.error('[backup] Erro ao limpar backups antigos:', err.message);
+    logger.error({ err: err.message }, 'Erro ao limpar backups antigos');
   }
 }
 
 function startAutoBackup() {
   // Run backup daily at 03:00 AM
   cron.schedule('0 3 * * *', () => {
-    console.log('[backup] Executando rotina diária de backup...');
+    logger.info('Executando rotina diária de backup');
     runBackup();
   });
-  console.log('[backup] Rotina de backup diário agendada para as 03:00.');
+  logger.info('Rotina de backup diário agendada para as 03:00.');
 }
 
 module.exports = {

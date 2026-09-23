@@ -54,7 +54,7 @@ router.get('/', (req, res) => {
     avgTicket: Math.round(avgTicket * 100) / 100,
     serverCost: Math.round(monthlyServerCost * 100) / 100,
     netBalance: Math.round(netBalance * 100) / 100,
-    sales
+    sales,
   });
 });
 

@@ -30,15 +30,15 @@ if (mobileMenuToggle) {
 // Verificar autenticação
 (async () => {
   try {
-    const res = await fetch("/api/auth/check");
+    const res = await fetch('/api/auth/check');
     const data = await res.json();
     if (!data.authenticated) {
-      window.location.href = "/login.html";
-      return;
+      window.location.href = '/login.html';
+
     }
   } catch {
-    window.location.href = "/login.html";
-    return;
+    window.location.href = '/login.html';
+
   }
 })();
 
@@ -49,7 +49,7 @@ function animateValue(el, start, end, duration = 600) {
   if (start === end) { el.textContent = end; return; }
   const startTime = performance.now();
   const easeOut = t => 1 - Math.pow(1 - t, 3);
-  
+
   function update(currentTime) {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
@@ -63,7 +63,7 @@ function animateValue(el, start, end, duration = 600) {
 function animateMoneyValue(el, end, duration = 600) {
   const startTime = performance.now();
   const easeOut = t => 1 - Math.pow(1 - t, 3);
-  
+
   function update(currentTime) {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
@@ -90,35 +90,35 @@ function staggerItems(container, selector, delay = 60) {
 }
 
 // ---------- TOAST ----------
-function toast(msg, isError=false){
+function toast(msg, isError = false){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(()=> t.className = 'toast', 3000);
+  setTimeout(() => t.className = 'toast', 3000);
 }
 
-async function api(path, options={}){
+async function api(path, options = {}){
   const res = await fetch('/api' + path, {
-    headers: {'Content-Type':'application/json'},
-    ...options
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
   });
-  if(!res.ok){
-    const body = await res.json().catch(()=>({error:'Erro desconhecido'}));
+  if (!res.ok){
+    const body = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
     throw new Error(body.error || 'Erro na requisição');
   }
-  if(res.status === 204) return null;
+  if (res.status === 204) return null;
   return res.json();
 }
 
 function money(v){
-  return (v||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+  return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 // ---------- DATA/HORA EM BRASÍLIA (America/Sao_Paulo) ----------
 // "Hoje" e "mês atual" sempre no fuso de Brasília, independente do navegador.
 function brDateKey(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
   }).formatToParts(date);
   const o = {};
   parts.forEach(p => { o[p.type] = p.value; });
@@ -176,7 +176,7 @@ const ICONS = {
   renew: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10"/><path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"/></svg>',
   recovery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
-  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>'
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
 };
 
 // ---------- COPIAR CREDENCIAIS DO CLIENTE ----------
@@ -206,16 +206,16 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
   try {
     await api('/auth/logout', { method: 'POST' });
     window.location.href = '/login.html';
-  } catch(err) {
+  } catch (err) {
     window.location.href = '/login.html';
   }
 });
 
 // ---------- NAVEGAÇÃO ----------
-document.querySelectorAll('.nav-item').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     const panel = document.getElementById('tab-' + btn.dataset.tab);
     panel.classList.add('active');
@@ -223,26 +223,26 @@ document.querySelectorAll('.nav-item').forEach(btn=>{
     panel.style.animation = 'none';
     panel.offsetHeight; // force reflow
     panel.style.animation = '';
-    
-    if(btn.dataset.tab === 'dashboard') loadDashboard();
-    if(btn.dataset.tab === 'clientes') loadClients();
-    if(btn.dataset.tab === 'servidores') loadServers();
-    if(btn.dataset.tab === 'planos') loadPlans();
-    if(btn.dataset.tab === 'financeiro') loadFinanceiro();
-    if(btn.dataset.tab === 'revendedores') loadResellers();
+
+    if (btn.dataset.tab === 'dashboard') loadDashboard();
+    if (btn.dataset.tab === 'clientes') loadClients();
+    if (btn.dataset.tab === 'servidores') loadServers();
+    if (btn.dataset.tab === 'planos') loadPlans();
+    if (btn.dataset.tab === 'financeiro') loadFinanceiro();
+    if (btn.dataset.tab === 'revendedores') loadResellers();
   });
 });
 
 // ---------- DASHBOARD ----------
 async function loadDashboard(){
-  try{
+  try {
     const d = await api('/dashboard');
 
     // Animate KPI values
     const activeEl = document.getElementById('stat-active');
     const expiringEl = document.getElementById('stat-expiring');
     const overdueEl = document.getElementById('stat-overdue');
-    
+
     animateValue(activeEl, 0, d.totalActive);
     animateValue(expiringEl, 0, d.expiringSoonCount);
     animateValue(overdueEl, 0, d.overdueCount);
@@ -263,7 +263,7 @@ async function loadDashboard(){
     document.getElementById('stat-expired-count').textContent = d.expiredCount;
     document.getElementById('stat-expired-revenue').textContent = money(d.expiredRevenue) + '/mês';
     const expiredEl = document.getElementById('expired-list');
-    expiredEl.innerHTML = d.expiredClients.length ? d.expiredClients.map(c=>{
+    expiredEl.innerHTML = d.expiredClients.length ? d.expiredClients.map(c => {
       const [y,m,day] = c.due_date.split('-');
       return `
         <div class="expired-item">
@@ -282,7 +282,7 @@ async function loadDashboard(){
     // Lista de vencimentos
     upcomingCache = d.upcoming;
     const listEl = document.getElementById('upcoming-list');
-    listEl.innerHTML = d.upcoming.length ? d.upcoming.map(c=>{
+    listEl.innerHTML = d.upcoming.length ? d.upcoming.map(c => {
       const overdue = c.days_until_due < 0;
       const soon = !overdue && c.days_until_due <= 7;
       const cls = overdue ? 'overdue' : (soon ? 'soon' : '');
@@ -301,7 +301,7 @@ async function loadDashboard(){
         </div>`;
     }).join('') : '<p class="empty-msg">Nenhum vencimento próximo.</p>';
     if (d.upcoming.length) staggerItems(listEl, '.upcoming-item');
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 }
 
 // ---------- CLIENTES ----------
@@ -313,12 +313,12 @@ async function loadServersCache(){
   serversCache = await api('/servers');
   const filterSel = document.getElementById('filter-server');
   const modalSel = document.getElementById('client-server');
-  const options = serversCache.map(s=>`<option value="${s.id}" data-cost="${s.cost}">${escapeHtml(s.name)}${s.cost > 0 ? ' - ' + money(s.cost) : ''}</option>`).join('');
+  const options = serversCache.map(s => `<option value="${s.id}" data-cost="${s.cost}">${escapeHtml(s.name)}${s.cost > 0 ? ' - ' + money(s.cost) : ''}</option>`).join('');
   filterSel.innerHTML = '<option value="">Todos os servidores</option>' + options;
   modalSel.innerHTML = '<option value="">Nenhum</option>' + options;
 }
 
-document.getElementById('client-server').addEventListener('change', function(){
+document.getElementById('client-server').addEventListener('change', function (){
   const selected = this.options[this.selectedIndex];
   const cost = selected.dataset.cost;
   document.getElementById('server-cost-display').textContent = cost > 0 ? 'Custo mensal: ' + money(parseFloat(cost)) : '';
@@ -328,15 +328,15 @@ async function loadPlansCache(){
   plansCache = await api('/plans');
   const modalSel = document.getElementById('client-plan');
   const filterSel = document.getElementById('filter-plan');
-  const options = plansCache.map(p=>`<option value="${escapeHtml(p.name)}" data-price="${p.price}">${escapeHtml(p.name)} - ${money(p.price)}</option>`).join('');
+  const options = plansCache.map(p => `<option value="${escapeHtml(p.name)}" data-price="${p.price}">${escapeHtml(p.name)} - ${money(p.price)}</option>`).join('');
   modalSel.innerHTML = '<option value="">Nenhum</option>' + options;
-  filterSel.innerHTML = '<option value="">Todos os planos</option>' + plansCache.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+  filterSel.innerHTML = '<option value="">Todos os planos</option>' + plansCache.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
 }
 
-document.getElementById('client-plan').addEventListener('change', function(){
+document.getElementById('client-plan').addEventListener('change', function (){
   const selected = this.options[this.selectedIndex];
   const price = selected.dataset.price;
-  if(price) document.getElementById('client-price').value = price;
+  if (price) document.getElementById('client-price').value = price;
 });
 
 // ---------- LISTAGEM DE CLIENTES (segurança + paginação) ----------
@@ -347,21 +347,21 @@ const CLIENTS_PER_PAGE = 50;
 async function loadClients(){
   const tbody = document.getElementById('clients-tbody');
   tbody.innerHTML = '<tr class="row-loading"><td colspan="13">Carregando clientes…</td></tr>';
-  try{
-    if(!serversCache.length) await loadServersCache();
-    if(!plansCache.length) await loadPlansCache();
+  try {
+    if (!serversCache.length) await loadServersCache();
+    if (!plansCache.length) await loadPlansCache();
     const serverId = document.getElementById('filter-server').value;
     const planFilter = document.getElementById('filter-plan').value;
     const status = document.getElementById('filter-status').value;
     const params = new URLSearchParams();
-    if(serverId) params.set('server_id', serverId);
-    if(planFilter) params.set('plan', planFilter);
-    if(status) params.set('status', status);
+    if (serverId) params.set('server_id', serverId);
+    if (planFilter) params.set('plan', planFilter);
+    if (status) params.set('status', status);
     const clientsRaw = await api('/clients?' + params.toString());
     const nameFilter = document.getElementById('filter-name').value.trim().toLowerCase();
     clientsAll = nameFilter ? clientsRaw.filter(c => c.name.toLowerCase().includes(nameFilter)) : clientsRaw;
     renderClientsTable();
-  }catch(err){ tbody.innerHTML = ''; toast(err.message, true); }
+  } catch (err){ tbody.innerHTML = ''; toast(err.message, true); }
 }
 
 function renderClientsTable(){
@@ -407,8 +407,8 @@ function renderClientRow(c){
     <td>${due}</td>
     <td>${escapeHtml(c.username || '—')}</td>
     <td>${c.has_password
-      ? `<button class="btn-icon btn-copy" data-id="${c.id}" onclick="copyCredentials(this.dataset.id)" title="Copiar credenciais" aria-label="Copiar credenciais">${ICONS.copy}</button>`
-      : '<span class="table-count">—</span>'}</td>
+    ? `<button class="btn-icon btn-copy" data-id="${c.id}" onclick="copyCredentials(this.dataset.id)" title="Copiar credenciais" aria-label="Copiar credenciais">${ICONS.copy}</button>`
+    : '<span class="table-count">—</span>'}</td>
     <td><span class="badge ${escapeHtml(c.status)}">${escapeHtml(c.status)}</span></td>
     <td class="row-actions">
       <button class="btn-icon" data-id="${c.id}" onclick="editClient(this.dataset.id)" title="Editar" aria-label="Editar">${ICONS.edit}</button>
@@ -428,9 +428,9 @@ document.getElementById('filter-name').addEventListener('input', () => {
   filterDebounce = setTimeout(() => { clientsPage = 1; loadClients(); }, 300);
 });
 
-document.getElementById('btn-new-client').addEventListener('click', async ()=>{
-  if(!serversCache.length) await loadServersCache();
-  if(!plansCache.length) await loadPlansCache();
+document.getElementById('btn-new-client').addEventListener('click', async () => {
+  if (!serversCache.length) await loadServersCache();
+  if (!plansCache.length) await loadPlansCache();
   document.getElementById('client-modal-title').textContent = 'Novo cliente';
   document.getElementById('client-id').value = '';
   document.getElementById('client-name').value = '';
@@ -448,8 +448,8 @@ document.getElementById('btn-new-client').addEventListener('click', async ()=>{
 });
 
 window.editClient = async (id) => {
-  if(!serversCache.length) await loadServersCache();
-  if(!plansCache.length) await loadPlansCache();
+  if (!serversCache.length) await loadServersCache();
+  if (!plansCache.length) await loadPlansCache();
   const c = await api('/clients/' + id);
   document.getElementById('client-modal-title').textContent = 'Editar cliente';
   document.getElementById('client-id').value = c.id;
@@ -469,19 +469,19 @@ window.editClient = async (id) => {
 };
 
 window.deleteClient = async (id) => {
-  if(!await confirmDialog('Excluir este cliente? Esta ação não pode ser desfeita.')) return;
-  try{
-    await api('/clients/' + id, {method:'DELETE'});
+  if (!await confirmDialog('Excluir este cliente? Esta ação não pode ser desfeita.')) return;
+  try {
+    await api('/clients/' + id, { method: 'DELETE' });
     toast('Cliente excluído.');
     loadClients();
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 };
 
-document.getElementById('client-cancel').addEventListener('click', ()=>{
+document.getElementById('client-cancel').addEventListener('click', () => {
   document.getElementById('client-modal').classList.remove('active');
 });
 
-document.getElementById('client-save').addEventListener('click', async ()=>{
+document.getElementById('client-save').addEventListener('click', async () => {
   const id = document.getElementById('client-id').value;
   const payload = {
     name: document.getElementById('client-name').value.trim(),
@@ -493,19 +493,19 @@ document.getElementById('client-save').addEventListener('click', async ()=>{
     due_date: document.getElementById('client-due').value,
     status: document.getElementById('client-status').value,
     username: document.getElementById('client-username').value.trim(),
-    password: document.getElementById('client-password').value.trim()
+    password: document.getElementById('client-password').value.trim(),
   };
-  if(!payload.name || !payload.phone || !payload.due_date){
+  if (!payload.name || !payload.phone || !payload.due_date){
     toast('Preencha nome, telefone e data de vencimento.', true);
     return;
   }
-  try{
-    if(id) await api('/clients/' + id, {method:'PUT', body:JSON.stringify(payload)});
-    else await api('/clients', {method:'POST', body:JSON.stringify(payload)});
+  try {
+    if (id) await api('/clients/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+    else await api('/clients', { method: 'POST', body: JSON.stringify(payload) });
     document.getElementById('client-modal').classList.remove('active');
     toast('Cliente salvo.');
     loadClients();
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 });
 
 let renewClientCache = null;
@@ -549,7 +549,7 @@ document.getElementById('renew-date').addEventListener('change', function () {
   const preview = [
     String(base.getFullYear()).padStart(4, '0'),
     String(base.getMonth() + 1).padStart(2, '0'),
-    String(base.getDate()).padStart(2, '0')
+    String(base.getDate()).padStart(2, '0'),
   ];
   document.getElementById('renew-hint').textContent =
     `Vencimento previsto: ${preview[2]}/${preview[1]}/${preview[0]} (${months} meses)`;
@@ -561,23 +561,23 @@ document.getElementById('renew-confirm').addEventListener('click', async () => {
   if (!renewalDate) { toast('Informe a data da renovação.', true); return; }
   try {
     const result = await api(`/clients/${id}/renew`, {
-      method: 'POST', body: JSON.stringify({ renewal_date: renewalDate })
+      method: 'POST', body: JSON.stringify({ renewal_date: renewalDate }),
     });
     const newDate = result.due_date.split('-');
     toast(`Cliente renovado! Novo vencimento: ${newDate[2]}/${newDate[1]}/${newDate[0]}`);
     document.getElementById('renew-modal').classList.remove('active');
     loadDashboard();
-  } catch(err) { toast(err.message, true); }
+  } catch (err) { toast(err.message, true); }
 });
 
 // ---------- SERVIDORES ----------
 async function loadServers(){
   const tbody = document.getElementById('servers-tbody');
   tbody.innerHTML = '<tr class="row-loading"><td colspan="6">Carregando servidores…</td></tr>';
-  try{
+  try {
     const servers = await api('/servers');
     serversCache = servers;
-    tbody.innerHTML = servers.length ? servers.map(s=>`
+    tbody.innerHTML = servers.length ? servers.map(s => `
       <tr>
         <td>${escapeHtml(s.name)}</td>
         <td>${escapeHtml(s.provider || '—')}</td>
@@ -591,10 +591,10 @@ async function loadServers(){
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty-msg">Nenhum servidor cadastrado.</td></tr>';
     staggerItems(tbody, 'tr', 40);
-  }catch(err){ tbody.innerHTML = ''; toast(err.message, true); }
+  } catch (err){ tbody.innerHTML = ''; toast(err.message, true); }
 }
 
-document.getElementById('btn-new-server').addEventListener('click', ()=>{
+document.getElementById('btn-new-server').addEventListener('click', () => {
   document.getElementById('server-modal-title').textContent = 'Novo servidor';
   document.getElementById('server-id').value = '';
   document.getElementById('server-name').value = '';
@@ -606,8 +606,8 @@ document.getElementById('btn-new-server').addEventListener('click', ()=>{
 });
 
 window.editServer = async (id) => {
-  const s = serversCache.find(x=>x.id === id) || await api('/servers/' + id).catch(()=>null);
-  if(!s) return;
+  const s = serversCache.find(x => x.id === id) || await api('/servers/' + id).catch(() => null);
+  if (!s) return;
   document.getElementById('server-modal-title').textContent = 'Editar servidor';
   document.getElementById('server-id').value = s.id;
   document.getElementById('server-name').value = s.name;
@@ -619,40 +619,40 @@ window.editServer = async (id) => {
 };
 
 window.deleteServer = async (id) => {
-  if(!await confirmDialog('Excluir este servidor?')) return;
-  try{ await api('/servers/' + id, {method:'DELETE'}); toast('Servidor excluído.'); loadServers(); }
-  catch(err){ toast(err.message, true); }
+  if (!await confirmDialog('Excluir este servidor?')) return;
+  try { await api('/servers/' + id, { method: 'DELETE' }); toast('Servidor excluído.'); loadServers(); }
+  catch (err){ toast(err.message, true); }
 };
 
-document.getElementById('server-cancel').addEventListener('click', ()=> document.getElementById('server-modal').classList.remove('active'));
+document.getElementById('server-cancel').addEventListener('click', () => document.getElementById('server-modal').classList.remove('active'));
 
-document.getElementById('server-save').addEventListener('click', async ()=>{
+document.getElementById('server-save').addEventListener('click', async () => {
   const id = document.getElementById('server-id').value;
   const payload = {
     name: document.getElementById('server-name').value.trim(),
     provider: document.getElementById('server-provider').value.trim(),
     cost: parseFloat(document.getElementById('server-cost').value) || 0,
     status: document.getElementById('server-status').value,
-    notes: document.getElementById('server-notes').value.trim()
+    notes: document.getElementById('server-notes').value.trim(),
   };
-  if(!payload.name){ toast('Informe o nome do servidor.', true); return; }
-  try{
-    if(id) await api('/servers/' + id, {method:'PUT', body:JSON.stringify(payload)});
-    else await api('/servers', {method:'POST', body:JSON.stringify(payload)});
+  if (!payload.name){ toast('Informe o nome do servidor.', true); return; }
+  try {
+    if (id) await api('/servers/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+    else await api('/servers', { method: 'POST', body: JSON.stringify(payload) });
     document.getElementById('server-modal').classList.remove('active');
     toast('Servidor salvo.'); loadServers(); serversCache = [];
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 });
 
 // ---------- PLANOS ----------
 async function loadPlans(){
   const tbody = document.getElementById('plans-tbody');
   tbody.innerHTML = '<tr class="row-loading"><td colspan="6">Carregando planos…</td></tr>';
-  try{
+  try {
     const plans = await api('/plans');
     plansCache = plans;
-    const durationLabel = (m) => m === 1 ? '1 mês' : m < 12 ? m + ' meses' : (m/12) + ' ano' + (m > 12 ? 's' : '');
-    tbody.innerHTML = plans.length ? plans.map(p=>`
+    const durationLabel = (m) => m === 1 ? '1 mês' : m < 12 ? m + ' meses' : (m / 12) + ' ano' + (m > 12 ? 's' : '');
+    tbody.innerHTML = plans.length ? plans.map(p => `
       <tr>
         <td>${escapeHtml(p.name)}</td><td>${money(p.price)}</td><td>${durationLabel(p.duration_months)}</td>
         <td>${p.screens || 1}</td><td>${p.active_clients}</td>
@@ -663,10 +663,10 @@ async function loadPlans(){
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty-msg">Nenhum plano cadastrado.</td></tr>';
     staggerItems(tbody, 'tr', 40);
-  }catch(err){ tbody.innerHTML = ''; toast(err.message, true); }
+  } catch (err){ tbody.innerHTML = ''; toast(err.message, true); }
 }
 
-document.getElementById('btn-new-plan').addEventListener('click', ()=>{
+document.getElementById('btn-new-plan').addEventListener('click', () => {
   document.getElementById('plan-modal-title').textContent = 'Novo plano';
   document.getElementById('plan-id').value = '';
   document.getElementById('plan-name').value = '';
@@ -677,8 +677,8 @@ document.getElementById('btn-new-plan').addEventListener('click', ()=>{
 });
 
 window.editPlan = async (id) => {
-  const p = plansCache.find(x=>x.id === id) || await api('/plans/' + id).catch(()=>null);
-  if(!p) return;
+  const p = plansCache.find(x => x.id === id) || await api('/plans/' + id).catch(() => null);
+  if (!p) return;
   document.getElementById('plan-modal-title').textContent = 'Editar plano';
   document.getElementById('plan-id').value = p.id;
   document.getElementById('plan-name').value = p.name;
@@ -689,43 +689,43 @@ window.editPlan = async (id) => {
 };
 
 window.deletePlan = async (id) => {
-  if(!await confirmDialog('Excluir este plano?')) return;
-  try{ await api('/plans/' + id, {method:'DELETE'}); toast('Plano excluído.'); loadPlans(); plansCache = []; }
-  catch(err){ toast(err.message, true); }
+  if (!await confirmDialog('Excluir este plano?')) return;
+  try { await api('/plans/' + id, { method: 'DELETE' }); toast('Plano excluído.'); loadPlans(); plansCache = []; }
+  catch (err){ toast(err.message, true); }
 };
 
-document.getElementById('plan-cancel').addEventListener('click', ()=> document.getElementById('plan-modal').classList.remove('active'));
+document.getElementById('plan-cancel').addEventListener('click', () => document.getElementById('plan-modal').classList.remove('active'));
 
-document.getElementById('plan-save').addEventListener('click', async ()=>{
+document.getElementById('plan-save').addEventListener('click', async () => {
   const id = document.getElementById('plan-id').value;
   const payload = {
     name: document.getElementById('plan-name').value.trim(),
     price: parseFloat(document.getElementById('plan-price').value) || 0,
     duration_months: parseInt(document.getElementById('plan-duration').value) || 1,
-    screens: parseInt(document.getElementById('plan-screens').value) || 1
+    screens: parseInt(document.getElementById('plan-screens').value) || 1,
   };
-  if(!payload.name){ toast('Informe o nome do plano.', true); return; }
-  try{
-    if(id) await api('/plans/' + id, {method:'PUT', body:JSON.stringify(payload)});
-    else await api('/plans', {method:'POST', body:JSON.stringify(payload)});
+  if (!payload.name){ toast('Informe o nome do plano.', true); return; }
+  try {
+    if (id) await api('/plans/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+    else await api('/plans', { method: 'POST', body: JSON.stringify(payload) });
     document.getElementById('plan-modal').classList.remove('active');
     toast('Plano salvo.'); loadPlans(); plansCache = [];
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 });
 
 // ---------- FINANCEIRO ----------
 async function loadFinanceiro(){
-  try{
+  try {
     const monthInput = document.getElementById('financeiro-month');
     const month = monthInput.value || brMonthKey(new Date());
     const [d, dash] = await Promise.all([
       api('/sales?month=' + month),
-      api('/dashboard?month=' + month)
+      api('/dashboard?month=' + month),
     ]);
 
     const MONTH_LABELS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const fmtMonthLabel = (m) => {
-      const parts = MONTH_LABELS[parseInt(m.split('-')[1],10)-1];
+      const parts = MONTH_LABELS[parseInt(m.split('-')[1],10) - 1];
       return `${parts} ${m.split('-')[0]}`;
     };
     const isCur = dash.isCurrentMonth;
@@ -765,7 +765,7 @@ async function loadFinanceiro(){
       const maxH = 170;
       const curMonth = brMonthKey(new Date());
       let html = '';
-      for(const h of history){
+      for (const h of history){
         const isSel = h.month === dash.selectedMonth;
         const isNeg = h.netProfit < 0;
         const isPartial = dash.partialMonth && h.month === curMonth;
@@ -789,11 +789,11 @@ async function loadFinanceiro(){
 
     // Grafico de servidores
     const chartEl = document.getElementById('fin-server-chart');
-    const maxCount = Math.max(1, ...dash.serverRanking.map(s=>s.client_count));
-    chartEl.innerHTML = dash.serverRanking.length ? dash.serverRanking.map(s=>`
+    const maxCount = Math.max(1, ...dash.serverRanking.map(s => s.client_count));
+    chartEl.innerHTML = dash.serverRanking.length ? dash.serverRanking.map(s => `
       <div class="chart-row">
         <span class="chart-label" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
-        <span class="chart-bar-track"><span class="chart-bar-fill" style="width:${(s.client_count/maxCount*100)}%"></span></span>
+        <span class="chart-bar-track"><span class="chart-bar-fill" style="width:${(s.client_count / maxCount * 100)}%"></span></span>
         <span class="chart-count">${s.client_count} · ${money(s.mrr)}/mês</span>
       </div>
     `).join('') : '<p class="empty-msg">Nenhum servidor cadastrado.</p>';
@@ -801,11 +801,11 @@ async function loadFinanceiro(){
 
     // Grafico de planos
     const planEl = document.getElementById('fin-plan-chart');
-    const maxPlan = Math.max(1, ...dash.planDistribution.map(p=>p.count));
-    planEl.innerHTML = dash.planDistribution.length ? dash.planDistribution.map(p=>`
+    const maxPlan = Math.max(1, ...dash.planDistribution.map(p => p.count));
+    planEl.innerHTML = dash.planDistribution.length ? dash.planDistribution.map(p => `
       <div class="chart-row">
         <span class="chart-label" title="${escapeHtml(p.plan_name)}">${escapeHtml(p.plan_name)}</span>
-        <span class="chart-bar-track"><span class="chart-bar-fill" style="width:${(p.count/maxPlan*100)}%"></span></span>
+        <span class="chart-bar-track"><span class="chart-bar-fill" style="width:${(p.count / maxPlan * 100)}%"></span></span>
         <span class="chart-count">${p.count} · ${money(p.mrr)}/mês</span>
       </div>
     `).join('') : '<p class="empty-msg">Nenhum plano associado.</p>';
@@ -830,7 +830,7 @@ async function loadFinanceiro(){
         </tr>`;
     }).join('') : '<tr><td colspan="7" class="empty-msg">Nenhuma venda neste mês.</td></tr>';
     staggerItems(tbody, 'tr', 30);
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 }
 
 window.undoSale = async (id, clientName) => {
@@ -839,7 +839,7 @@ window.undoSale = async (id, clientName) => {
     await api('/sales/' + id, { method: 'DELETE' });
     toast('Venda desfeita com sucesso.');
     loadFinanceiro();
-  } catch(err) { toast(err.message, true); }
+  } catch (err) { toast(err.message, true); }
 };
 
 document.getElementById('financeiro-month').addEventListener('change', loadFinanceiro);
@@ -848,9 +848,9 @@ document.getElementById('financeiro-month').value = brMonthKey(new Date());
 // ---------- WHATSAPP ----------
 function renderWaStatus(data){
   const { status, qr, phoneNumber } = data;
-  const dotMap = { connected:'connected', connecting:'connecting', qr:'connecting', disconnected:'disconnected' };
-  const textMap = { connected:'Conectado', connecting:'Conectando…', qr:'Aguardando leitura do QR code', disconnected:'Desconectado' };
-  document.querySelectorAll('#wa-big-dot, #sidebar-wa-status .signal-dot').forEach(el=>{
+  const dotMap = { connected: 'connected', connecting: 'connecting', qr: 'connecting', disconnected: 'disconnected' };
+  const textMap = { connected: 'Conectado', connecting: 'Conectando…', qr: 'Aguardando leitura do QR code', disconnected: 'Desconectado' };
+  document.querySelectorAll('#wa-big-dot, #sidebar-wa-status .signal-dot').forEach(el => {
     el.className = 'signal-dot ' + (dotMap[status] || 'disconnected');
   });
   document.getElementById('wa-status-text').textContent = textMap[status] || status;
@@ -859,7 +859,7 @@ function renderWaStatus(data){
   document.getElementById('wa-phone').textContent = phoneNumber ? `+${phoneNumber}` : '';
   const qrImg = document.getElementById('wa-qr-img');
   const placeholder = document.getElementById('wa-placeholder');
-  if(qr){ qrImg.src = qr; qrImg.style.display = 'block'; placeholder.style.display = 'none'; }
+  if (qr){ qrImg.src = qr; qrImg.style.display = 'block'; placeholder.style.display = 'none'; }
   else { qrImg.style.display = 'none'; placeholder.style.display = 'flex'; placeholder.querySelector('p').textContent = status === 'connected' ? 'WhatsApp conectado com sucesso.' : 'Clique em "Conectar" para gerar o QR code.'; }
   document.getElementById('btn-wa-connect').style.display = status === 'connected' ? 'none' : 'inline-block';
   document.getElementById('btn-wa-disconnect').style.display = status === 'connected' ? 'inline-block' : 'none';
@@ -875,11 +875,11 @@ socket.on('wa:message-error', (data) => {
   toast(`✗ Falha ao enviar para ${data.clientName}: ${data.error}`, true);
 });
 
-document.getElementById('btn-wa-connect').addEventListener('click', async ()=>{
-  try{ await api('/whatsapp/connect', {method:'POST'}); } catch(err){ toast(err.message, true); }
+document.getElementById('btn-wa-connect').addEventListener('click', async () => {
+  try { await api('/whatsapp/connect', { method: 'POST' }); } catch (err){ toast(err.message, true); }
 });
-document.getElementById('btn-wa-disconnect').addEventListener('click', async ()=>{
-  try{ await api('/whatsapp/disconnect', {method:'POST'}); toast('WhatsApp desconectado.'); } catch(err){ toast(err.message, true); }
+document.getElementById('btn-wa-disconnect').addEventListener('click', async () => {
+  try { await api('/whatsapp/disconnect', { method: 'POST' }); toast('WhatsApp desconectado.'); } catch (err){ toast(err.message, true); }
 });
 
 // ---------- RECUPERAÇÃO ----------
@@ -892,7 +892,7 @@ window.sendRecovery = async (id, name) => {
     // Recarrega a aba ativa (dashboard ou clientes)
     if (typeof loadDashboard === 'function' && document.getElementById('tab-dashboard')?.classList.contains('active')) loadDashboard();
     if (typeof loadClients === 'function' && document.getElementById('tab-clientes')?.classList.contains('active')) loadClients();
-  } catch(err) { toast(err.message, true); }
+  } catch (err) { toast(err.message, true); }
 };
 
 // ---------- FILA DE MENSAGENS ----------
@@ -901,7 +901,7 @@ async function loadQueue() {
     const [status, pending, history] = await Promise.all([
       api('/whatsapp/queue/status'),
       api('/whatsapp/queue'),
-      api('/whatsapp/queue/history')
+      api('/whatsapp/queue/history'),
     ]);
 
     document.getElementById('queue-pending-count').textContent = status.pending || 0;
@@ -968,7 +968,7 @@ async function loadQueue() {
         </div>
       `).join('');
     }
-  } catch(err) {
+  } catch (err) {
     console.error('Erro ao carregar fila:', err);
   }
 }
@@ -995,7 +995,7 @@ window.cancelQueueItem = async (id) => {
     await api(`/whatsapp/queue/${id}/cancel`, { method: 'POST' });
     toast('Mensagem cancelada.');
     loadQueue();
-  } catch(err) { toast(err.message, true); }
+  } catch (err) { toast(err.message, true); }
 };
 
 document.getElementById('btn-queue-refresh').addEventListener('click', loadQueue);
@@ -1006,7 +1006,7 @@ document.getElementById('btn-queue-cancel-all').addEventListener('click', async 
     await api('/whatsapp/queue/cancel-all', { method: 'POST' });
     toast('Todas as mensagens pendentes foram canceladas.');
     loadQueue();
-  } catch(err) { toast(err.message, true); }
+  } catch (err) { toast(err.message, true); }
 });
 
 document.getElementById('btn-queue-clear').addEventListener('click', async () => {
@@ -1015,7 +1015,7 @@ document.getElementById('btn-queue-clear').addEventListener('click', async () =>
     await api('/whatsapp/queue/clear-history', { method: 'POST' });
     toast('Histórico limpo.');
     loadQueue();
-  } catch(err) { toast(err.message, true); }
+  } catch (err) { toast(err.message, true); }
 });
 
 // Atualizar fila via socket
@@ -1033,7 +1033,7 @@ originalNavClick.forEach(btn => {
 
 // ---------- SETTINGS ----------
 async function loadSettings(){
-  try{
+  try {
     const s = await api('/settings');
     document.getElementById('reminder-days').value = s.reminder_days_before || 3;
     document.getElementById('reminder-template').value = s.reminder_message_template || '';
@@ -1061,16 +1061,16 @@ async function loadSettings(){
     const recoveryMinute = s.recovery_schedule_minute || '40';
     document.getElementById('recovery-schedule-time').value = `${recoveryHour.padStart(2, '0')}:${recoveryMinute.padStart(2, '0')}`;
     document.getElementById('recovery-schedule-enabled').checked = s.recovery_schedule_enabled !== '0';
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 }
 
-document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
-  try{
+document.getElementById('btn-save-settings').addEventListener('click', async () => {
+  try {
     const reminderTime = document.getElementById('reminder-schedule-time').value.split(':');
     const postExpiryTime = document.getElementById('post-expiry-schedule-time').value.split(':');
     const recoveryTime = document.getElementById('recovery-schedule-time').value.split(':');
 
-    await api('/settings', {method:'PUT', body: JSON.stringify({
+    await api('/settings', { method: 'PUT', body: JSON.stringify({
       reminder_days_before: parseInt(document.getElementById('reminder-days').value, 10) || 3,
       reminder_message_template: document.getElementById('reminder-template').value,
       welcome_message_template: document.getElementById('welcome-template').value,
@@ -1089,10 +1089,10 @@ document.getElementById('btn-save-settings').addEventListener('click', async ()=
       post_expiry_schedule_enabled: document.getElementById('post-expiry-schedule-enabled').checked ? '1' : '0',
       recovery_schedule_hour: parseInt(recoveryTime[0], 10),
       recovery_schedule_minute: parseInt(recoveryTime[1], 10),
-      recovery_schedule_enabled: document.getElementById('recovery-schedule-enabled').checked ? '1' : '0'
-    })});
+      recovery_schedule_enabled: document.getElementById('recovery-schedule-enabled').checked ? '1' : '0',
+    }) });
     toast('Configurações salvas. Horários atualizados!');
-  }catch(err){ toast(err.message, true); }
+  } catch (err){ toast(err.message, true); }
 });
 
 // ---------- REVENDEDORES ----------
@@ -1101,7 +1101,7 @@ let resellersCache = [];
 const MONTH_LABELS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 function fmtRevMonthLabel(m) {
   const parts = m.split('-');
-  return MONTH_LABELS[parseInt(parts[1],10)-1] + ' ' + parts[0];
+  return MONTH_LABELS[parseInt(parts[1],10) - 1] + ' ' + parts[0];
 }
 
 async function loadResellers() {
@@ -1123,7 +1123,7 @@ async function loadResellerReport() {
 
     const [summary, history] = await Promise.all([
       api('/resellers/report/summary?month=' + month),
-      api('/resellers/report/history')
+      api('/resellers/report/history'),
     ]);
 
     const isCur = month === brMonthKey(new Date());
@@ -1313,7 +1313,7 @@ document.getElementById('revendedores-month').value = brMonthKey(new Date());
 
 // Modal Revendedor
 document.getElementById('btn-new-reseller').addEventListener('click', () => openResellerModal());
-window.editReseller = async function(id) {
+window.editReseller = async function (id) {
   const r = await api('/resellers/' + id);
   openResellerModal(r);
 };
@@ -1337,7 +1337,7 @@ document.getElementById('reseller-save').addEventListener('click', async () => {
     phone: document.getElementById('reseller-phone').value,
     email: document.getElementById('reseller-email').value,
     status: document.getElementById('reseller-status').value,
-    notes: document.getElementById('reseller-notes').value
+    notes: document.getElementById('reseller-notes').value,
   };
   try {
     if (id) { await api('/resellers/' + id, { method: 'PUT', body: JSON.stringify(data) }); toast('Revendedor atualizado!'); }
@@ -1346,7 +1346,7 @@ document.getElementById('reseller-save').addEventListener('click', async () => {
     loadResellers();
   } catch (err) { toast(err.message, true); }
 });
-window.deleteReseller = async function(id) {
+window.deleteReseller = async function (id) {
   if (!await confirmDialog('Excluir este revendedor?')) return;
   try { await api('/resellers/' + id, { method: 'DELETE' }); toast('Revendedor excluído.'); loadResellers(); }
   catch (err) { toast(err.message, true); }
@@ -1354,7 +1354,7 @@ window.deleteReseller = async function(id) {
 
 // Modal Compra
 document.getElementById('btn-new-purchase').addEventListener('click', () => openPurchaseModal());
-window.editPurchase = async function(id) {
+window.editPurchase = async function (id) {
   const purchases = await api('/resellers/purchases/all');
   const p = purchases.find(x => x.id === id);
   if (p) openPurchaseModal(p);
@@ -1396,7 +1396,7 @@ document.getElementById('purchase-save').addEventListener('click', async () => {
     amount_paid: parseFloat(document.getElementById('purchase-amount').value),
     cost_per_credit: parseFloat(document.getElementById('purchase-cost').value),
     purchase_date: document.getElementById('purchase-date').value,
-    notes: document.getElementById('purchase-notes').value
+    notes: document.getElementById('purchase-notes').value,
   };
   try {
     if (id) { await api('/resellers/purchases/' + id, { method: 'PUT', body: JSON.stringify(data) }); toast('Compra atualizada!'); }
@@ -1405,7 +1405,7 @@ document.getElementById('purchase-save').addEventListener('click', async () => {
     loadResellers();
   } catch (err) { toast(err.message, true); }
 });
-window.deletePurchase = async function(id) {
+window.deletePurchase = async function (id) {
   if (!await confirmDialog('Excluir esta compra?')) return;
   try { await api('/resellers/purchases/' + id, { method: 'DELETE' }); toast('Compra excluída.'); loadResellers(); }
   catch (err) { toast(err.message, true); }
@@ -1421,7 +1421,7 @@ document.getElementById('btn-wa-test').addEventListener('click', async () => {
     welcome: 'welcome-template',
     recovery: 'recovery-template',
     'post-expiry': 'post-expiry-template',
-    renewal: 'renewal-template'
+    renewal: 'renewal-template',
   };
   const message = document.getElementById(templates[which]).value;
   if (!message) { toast('O modelo selecionado está vazio.', true); return; }

@@ -37,7 +37,7 @@ router.get('/clients', (req, res) => {
         c.status,
         c.username || '',
         pass,
-        c.created_at
+        c.created_at,
       ];
       rows.push(row.map(escapeCsvField).join(';'));
     }
@@ -77,7 +77,7 @@ router.get('/sales', (req, res) => {
         s.phone || '',
         s.plan || '',
         s.type === 'novo' ? 'Novo Cadastro' : 'Renovação',
-        s.value || 0
+        s.value || 0,
       ];
       rows.push(row.map(escapeCsvField).join(';'));
     }

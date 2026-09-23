@@ -34,7 +34,7 @@ router.post('/', (req, res, next) => {
 
     const { name, price, duration_months, screens } = req.body;
     const stmt = db.prepare(
-      'INSERT INTO plans (name, price, duration_months, screens) VALUES (?, ?, ?, ?)'
+      'INSERT INTO plans (name, price, duration_months, screens) VALUES (?, ?, ?, ?)',
     );
     const info = stmt.run(name.trim(), price || 0, duration_months || 1, screens || 1);
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(info.lastInsertRowid);
@@ -52,13 +52,13 @@ router.put('/:id', (req, res, next) => {
 
     const { name, price, duration_months, screens } = req.body;
     db.prepare(
-      'UPDATE plans SET name = ?, price = ?, duration_months = ?, screens = ? WHERE id = ?'
+      'UPDATE plans SET name = ?, price = ?, duration_months = ?, screens = ? WHERE id = ?',
     ).run(
       name ?? existing.name,
       price ?? existing.price,
       duration_months ?? existing.duration_months,
       screens ?? existing.screens,
-      req.params.id
+      req.params.id,
     );
     const updated = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id);
     res.json(updated);
@@ -74,7 +74,7 @@ router.delete('/:id', (req, res, next) => {
     if (!existing) throw new NotFoundError('Plano não encontrado.');
 
     const clientCount = db.prepare(
-      "SELECT COUNT(*) as c FROM clients WHERE plan = ?"
+      'SELECT COUNT(*) as c FROM clients WHERE plan = ?',
     ).get(existing.name).c;
     if (clientCount > 0) {
       throw new ValidationError(`Não é possível excluir: ${clientCount} cliente(s) vinculado(s) a este plano.`);

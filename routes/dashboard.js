@@ -14,7 +14,7 @@ const {
   getPlanDistribution,
   getMonthSalesTotals,
   getMonthlyServerCostByMonth,
-  getMonthlyProfitHistory
+  getMonthlyProfitHistory,
 } = require('../db/queries/dashboard');
 
 function parseMonthParam(req) {
@@ -77,7 +77,7 @@ router.get('/', (req, res) => {
     { label: 'Próximos 3 dias', days: 3 },
     { label: '4–7 dias', days: 7 },
     { label: '8–15 dias', days: 15 },
-    { label: '16–30 dias', days: 30 }
+    { label: '16–30 dias', days: 30 },
   ];
   let prevDays = 0;
   for (const period of periods) {
@@ -89,7 +89,7 @@ router.get('/', (req, res) => {
     projectionByPeriod.push({
       label: period.label,
       clientCount: clientsInPeriod.length,
-      totalValue: Math.round(totalValue * 100) / 100
+      totalValue: Math.round(totalValue * 100) / 100,
     });
     prevDays = period.days;
   }
@@ -137,7 +137,7 @@ router.get('/', (req, res) => {
     renewalsRevenue,
     totalSalesCount,
     totalClientsMonth: salesTotals.totalClients,
-    profitHistory
+    profitHistory,
   });
 });
 
