@@ -192,7 +192,7 @@ class WhatsAppService {
           // QR refs esgotados = WhatsApp rate-limitou novas tentativas de pareamento.
           // Não adianta reconectar em loop: precisa de cooldown longo.
           const qrRefsEnded = /QR refs attempts ended/i.test(closeReason);
-          console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut} — qrRefsEnded: ${qrRefsEnded} — msg: ${String(closeMsg).slice(0, 160)}`);
+          console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut} — qrRefsEnded: ${qrRefsEnded} — msg: ${String(closeReason).slice(0, 160)}`);
           this.disconnectCount++;
           this.consecutiveFailures++;
           this.lastStatusCode = statusCode;
@@ -208,7 +208,6 @@ class WhatsAppService {
             this.sock = null;
           }
 
-          const closeMsg = (lastDisconnect && lastDisconnect.error && lastDisconnect.error.message) || '';
           if (isLoggedOut && this.sessionEstablished) {
             console.log('[whatsapp] Sessão inválida (loggedOut) após sessão estabelecida — limpando credenciais...');
             this.sessionEstablished = false;
