@@ -4,8 +4,8 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers,
+  proto,
 } = require('@whiskeysockets/baileys');
-const { proto } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
@@ -37,6 +37,11 @@ class WhatsAppService {
     this.lastQrTime = 0;
     this.manualReconnect = false;
     this.pairingWindowUntil = 0;
+    // Cache simples PN -> LID para evitar consultas repetidas
+    this.lidCache = new Map();
+    // Store em memória msgId WA -> texto, para o getMessage() atender
+    // retries do WhatsApp (sem isso o destinatário fica em "aguardando mensagem").
+    this.recentMessages = new Map();
   }
 
   setQueue(queue) {
@@ -115,6 +120,38 @@ class WhatsAppService {
     return code;
   }
 
+  // Resolve PN (Phone Number JID) para LID (Linked Identity JID) via onWhatsApp()
+  // Baileys 7.x: todas as novas sessões Signal usam LID por padrão.
+  // Mensagens enviadas para PN antigo não são descriptografadas por clientes LID-only.
+  async resolveLID(phone) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) throw new Error('Telefone inválido.');
+
+    // Cache hit
+    if (this.lidCache.has(normalized)) {
+      return this.lidCache.get(normalized);
+    }
+
+    // onWhatsApp retorna array de { jid, exists } — o jid vem no formato @lid
+    try {
+      const results = await this.sock.onWhatsApp(normalized);
+      if (results && results.length > 0 && results[0].exists && results[0].jid) {
+        const lid = results[0].jid;
+        this.lidCache.set(normalized, lid);
+        console.log(`[whatsapp] LID resolvido para ${normalized}: ${lid}`);
+        return lid;
+      }
+    } catch (e) {
+      console.warn(`[whatsapp] Falha ao resolver LID para ${normalized}:`, e.message);
+    }
+
+    // Fallback: se onWhatsApp falhar, tenta construir LID manualmente
+    // Formato LID típico: <numeric>@lid
+    // Mas sem o protocolo não garantimos o ID correto.
+    console.warn(`[whatsapp] Usando PN como fallback para ${normalized} (LID não resolvido)`);
+    return `${normalized}@s.whatsapp.net`;
+  }
+
   async connect(manual = false) {
     if (this.status === 'connecting' || this.status === 'connected') return;
     if (manual) {
@@ -156,6 +193,18 @@ class WhatsAppService {
         connectTimeoutMs: 60000,
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 25000,
+        // QR vive 10min por ref: sem isso os refs do servidor se esgotam em
+        // ~4min (60s + 20s por regeneração) e a conexão morre com
+        // "QR refs attempts ended" antes de o usuário escanear/entrar o código.
+        qrTimeout: 600000,
+        // getMessage permite ao Baileys re-criptografar mensagens no retry do WhatsApp.
+        // Evita placeholder "Aguardando mensagem" quando o destinatário pede retry.
+        getMessage: async (key) => {
+          if (key && key.id && this.recentMessages.has(key.id)) {
+            return { conversation: this.recentMessages.get(key.id) };
+          }
+          return null;
+        },
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -307,11 +356,11 @@ class WhatsAppService {
             this.reconnectTimer = setTimeout(() => this.connect(), 2000);
           } else if (qrRefsEnded && Date.now() < this.pairingWindowUntil) {
             // QR refs esgotaram DURANTE a janela de pareamento (código emitido / QR em tela).
-            // Cooldown de 10min mataria o pareamento: reconexão rápida + fluxo de
-            // registro limpo, para o usuário gerar um novo código imediatamente.
-            this.stripPairingCodeCreds();
-            console.log('[whatsapp] QR refs esgotados durante janela de pareamento — reconectando em 3s (gere novo código).');
-            this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+            // NÃO limpar creds: o pareamento ativo no celular precisa do estado de
+            // registro preservado na reconexão para o servidor concluir a vinculação.
+            // Reconnect moderado (15s) para não agravar o rate-limit de refs.
+            console.log('[whatsapp] QR refs esgotados durante janela de pareamento — reconectando em 15s preservando estado de registro.');
+            this.reconnectTimer = setTimeout(() => this.connect(), 15000);
           } else if (qrRefsEnded) {
             // WhatsApp bloqueou novas tentativas de QR por excesso de tentativas.
             // Cooldown longo (10 min) para não piorar o rate-limit.
@@ -392,7 +441,19 @@ class WhatsAppService {
     }
     const normalized = normalizePhone(phone);
     if (!normalized) throw new Error('Telefone inválido.');
-    const jid = `${normalized}@s.whatsapp.net`;
+
+    // Baileys 7.x: usar LID (Linked Identity) para garantir que destinatários
+    // em sessões LID-only consigam descriptografar a mensagem.
+    // Placeholder "Aguardando mensagem" acontece quando a msg chega criptografada
+    // com PN key mas o destinatário só tem sessão LID.
+    let jid;
+    try {
+      jid = await this.resolveLID(normalized);
+    } catch (e) {
+      console.warn('[whatsapp] Falha ao resolver LID, usando PN como fallback:', e.message);
+      jid = `${normalized}@s.whatsapp.net`;
+    }
+
     let result;
     try {
       result = await this.sock.sendMessage(jid, { text });
@@ -404,6 +465,13 @@ class WhatsAppService {
     const msgId = result && result.key && result.key.id;
     if (!msgId) {
       return result;
+    }
+    // Guarda o texto para o getMessage() atender retries futuros.
+    // Limite de 1000 entras (evita crescimento indefinido em memória).
+    this.recentMessages.set(msgId, text);
+    if (this.recentMessages.size > 1000) {
+      const oldest = this.recentMessages.keys().next().value;
+      this.recentMessages.delete(oldest);
     }
     const status = await this.waitForAck(msgId);
     return { ...result, ackStatus: status };
