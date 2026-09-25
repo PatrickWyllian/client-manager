@@ -11,7 +11,7 @@ module.exports = (waService, messageQueue) => {
 
   router.post('/connect', async (req, res) => {
     try {
-      await waService.connect();
+      await waService.connect(true);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: err.message });

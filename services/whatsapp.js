@@ -27,11 +27,14 @@ class WhatsAppService {
     this.phoneNumber = null;
     this.queue = null;
     this.reconnectTimer = null;
-    this.reconnectDelayMs = 5000;
+    this.reconnectDelayMs = 15000;
     this.disconnectCount = 0;
+    this.consecutiveFailures = 0;
     this.lastStatusCode = null;
     this.pendingAcks = new Map();
     this.ackTimeoutMs = DEFAULT_ACK_TIMEOUT_MS;
+    this.lastQrTime = 0;
+    this.manualReconnect = false;
   }
 
   setQueue(queue) {
@@ -58,8 +61,13 @@ class WhatsAppService {
     return this.status === 'connected' && !!this.sock;
   }
 
-  async connect() {
+  async connect(manual = false) {
     if (this.status === 'connecting' || this.status === 'connected') return;
+    if (manual) {
+      this.manualReconnect = true;
+      this.consecutiveFailures = 0;
+      this.reconnectDelayMs = 15000;
+    }
 
     // Clear any existing reconnect timer
     if (this.reconnectTimer) {
@@ -89,8 +97,11 @@ class WhatsAppService {
         version,
         browser: Browsers.ubuntu('Chrome'),
         auth: state,
-        logger: pino({ level: 'silent' }),
+        logger: pino({ level: 'fatal' }),
         printQRInTerminal: false,
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 25000,
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -105,10 +116,15 @@ class WhatsAppService {
           if (typeof status === 'undefined' || status === null) continue;
           const pending = this.pendingAcks.get(key.id);
           if (!pending) continue;
+          // Ignora PENDING (1) - é apenas o primeiro update ao escrever no socket.
+          // Aguarda SERVER_ACK (2) ou superior para confirmar entrega.
+          if (status === proto.WebMessageInfo.Status.PENDING) {
+            continue;
+          }
           clearTimeout(pending.timer);
           this.pendingAcks.delete(key.id);
-          // Só conta como entregue quando o servidor confirma (SERVER_ACK ou superior)
-          if (status <= proto.WebMessageInfo.Status.PENDING) {
+          // Rejeita apenas em ERROR (0), resolve em SERVER_ACK (2) ou superior.
+          if (status === proto.WebMessageInfo.Status.ERROR) {
             pending.reject(new Error(`WhatsApp não confirmou a mensagem (ack status ${status}).`));
           } else {
             pending.resolve(status);
@@ -127,9 +143,14 @@ class WhatsAppService {
           if (typeof status === 'undefined' || status === null) continue;
           const pending = this.pendingAcks.get(key.id);
           if (!pending) continue;
+          // Ignora PENDING (1) - aguarda SERVER_ACK (2) ou superior.
+          if (status === proto.WebMessageInfo.Status.PENDING) {
+            continue;
+          }
           clearTimeout(pending.timer);
           this.pendingAcks.delete(key.id);
-          if (status <= proto.WebMessageInfo.Status.PENDING) {
+          // Rejeita apenas em ERROR (0), resolve em SERVER_ACK (2) ou superior.
+          if (status === proto.WebMessageInfo.Status.ERROR) {
             pending.reject(new Error(`WhatsApp não confirmou a mensagem (ack status ${status}).`));
           } else {
             pending.resolve(status);
@@ -143,6 +164,7 @@ class WhatsAppService {
         if (qr) {
           this.qrDataUrl = await QRCode.toDataURL(qr);
           this.status = 'qr';
+          this.lastQrTime = Date.now();
           this.emitStatus();
         }
 
@@ -150,7 +172,9 @@ class WhatsAppService {
           this.status = 'connected';
           this.qrDataUrl = null;
           this.phoneNumber = this.sock.user?.id?.split(':')[0] || null;
-          this.reconnectDelayMs = 5000;
+          this.reconnectDelayMs = 15000;
+          this.consecutiveFailures = 0;
+          this.manualReconnect = false;
           this.emitStatus();
           // Processar fila ao conectar
           if (this.queue) {
@@ -162,8 +186,13 @@ class WhatsAppService {
         if (connection === 'close') {
           const statusCode = lastDisconnect?.error?.output?.statusCode;
           const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-          console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut}`);
+          const closeReason = lastDisconnect?.error?.message || '';
+          // QR refs esgotados = WhatsApp rate-limitou novas tentativas de pareamento.
+          // Não adianta reconectar em loop: precisa de cooldown longo.
+          const qrRefsEnded = /QR refs attempts ended/i.test(closeReason);
+          console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut} — qrRefsEnded: ${qrRefsEnded}`);
           this.disconnectCount++;
+          this.consecutiveFailures++;
           this.lastStatusCode = statusCode;
 
           this.status = 'disconnected';
@@ -189,12 +218,32 @@ class WhatsAppService {
             } catch (e) {
               console.error('[whatsapp] Erro ao limpar wa-auth:', e.message);
             }
-            this.reconnectTimer = setTimeout(() => this.connect(), 2000);
+            this.consecutiveFailures = 0;
+            this.reconnectTimer = setTimeout(() => this.connect(), 5000);
+          } else if (qrRefsEnded) {
+            // WhatsApp bloqueou novas tentativas de QR por excesso de tentativas.
+            // Cooldown longo (10 min) para não piorar o rate-limit.
+            console.log('[whatsapp] QR rate-limit atingido — aguardando 10min antes de tentar de novo.');
+            this.reconnectDelayMs = 600000;
+            this.reconnectTimer = setTimeout(() => this.connect(), 600000);
+          } else if (this.consecutiveFailures >= 10 && !this.manualReconnect) {
+            // Circuit breaker: após 10 falhas seguidas, para de reconectar sozinho.
+            // Evita queimar tentativas de QR e força intervenção manual via painel.
+            console.log('[whatsapp] Circuit breaker: 10 falhas seguidas — reconexão automática pausada. Use "Conectar" no painel.');
+            this.status = 'failed';
+            this.emitStatus();
           } else {
-            // Backoff exponencial evita martelar reconexão em sessão instável
-            const delay = Math.min(this.reconnectDelayMs, 300000);
+            // Backoff exponencial com base maior (15s → 30s → 60s ... máx 5min).
+            // Se um QR foi gerado há menos de 90s, espera pelo menos 90s para
+            // dar tempo do usuário escanear antes de invalidá-lo com novo QR.
+            const sinceQr = Date.now() - (this.lastQrTime || 0);
+            const qrCooldown = this.lastQrTime ? Math.max(0, 90000 - sinceQr) : 0;
+            const delay = Math.max(
+              Math.min(this.reconnectDelayMs, 300000),
+              qrCooldown,
+            );
             this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 300000);
-            console.log(`[whatsapp] Reconectando em ${Math.round(delay / 1000)}s (backoff)`);
+            console.log(`[whatsapp] Reconectando em ${Math.round(delay / 1000)}s (backoff, falhas seguidas: ${this.consecutiveFailures})`);
             this.reconnectTimer = setTimeout(() => this.connect(), delay);
           }
         }
@@ -230,6 +279,7 @@ class WhatsAppService {
       qr: this.qrDataUrl,
       phoneNumber: this.phoneNumber,
       disconnectCount: this.disconnectCount,
+      consecutiveFailures: this.consecutiveFailures,
       lastStatusCode: this.lastStatusCode,
       pendingAcks: this.pendingAcks.size,
       socketUsable: this.isSocketUsable(),
