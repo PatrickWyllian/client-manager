@@ -860,8 +860,8 @@ document.getElementById('financeiro-month').value = brMonthKey(new Date());
 // ---------- WHATSAPP ----------
 function renderWaStatus(data){
   const { status, qr, phoneNumber } = data;
-  const dotMap = { connected: 'connected', connecting: 'connecting', qr: 'connecting', disconnected: 'disconnected' };
-  const textMap = { connected: 'Conectado', connecting: 'Conectando…', qr: 'Aguardando leitura do QR code', disconnected: 'Desconectado' };
+  const dotMap = { connected: 'connected', connecting: 'connecting', qr: 'connecting', disconnected: 'disconnected', failed: 'disconnected' };
+  const textMap = { connected: 'Conectado', connecting: 'Conectando…', qr: 'Aguardando leitura do QR code', disconnected: 'Desconectado', failed: 'Falhou — clique em "Conectar" para tentar de novo' };
   document.querySelectorAll('#wa-big-dot, #sidebar-wa-status .signal-dot').forEach(el => {
     el.className = 'signal-dot ' + (dotMap[status] || 'disconnected');
   });

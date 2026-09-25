@@ -192,7 +192,7 @@ class WhatsAppService {
           // QR refs esgotados = WhatsApp rate-limitou novas tentativas de pareamento.
           // Não adianta reconectar em loop: precisa de cooldown longo.
           const qrRefsEnded = /QR refs attempts ended/i.test(closeReason);
-          console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut} — qrRefsEnded: ${qrRefsEnded}`);
+          console.log(`[whatsapp] Conexão fechada — statusCode: ${statusCode} — isLoggedOut: ${isLoggedOut} — qrRefsEnded: ${qrRefsEnded} — msg: ${String(closeMsg).slice(0, 160)}`);
           this.disconnectCount++;
           this.consecutiveFailures++;
           this.lastStatusCode = statusCode;
@@ -208,6 +208,7 @@ class WhatsAppService {
             this.sock = null;
           }
 
+          const closeMsg = (lastDisconnect && lastDisconnect.error && lastDisconnect.error.message) || '';
           if (isLoggedOut && this.sessionEstablished) {
             console.log('[whatsapp] Sessão inválida (loggedOut) após sessão estabelecida — limpando credenciais...');
             this.sessionEstablished = false;
@@ -225,11 +226,22 @@ class WhatsAppService {
             this.reconnectDelayMs = 15000;
             this.reconnectTimer = setTimeout(() => this.connect(), 15000);
           } else if (isLoggedOut) {
-            // 401 numa sessão que NUNCA conectou (ex.: pareamento fresco rejeitado).
-            // NÃO apaga o wa-auth: preserva o estado e tenta de novo com backoff.
-            console.log('[whatsapp] 401 em sessão nunca estabelecida — mantendo wa-auth, nova tentativa com backoff.');
-            this.reconnectTimer = setTimeout(() => this.connect(), Math.min(this.reconnectDelayMs, 60000));
-            this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 300000);
+            // 401 numa sessão que NUNCA conectou (pareamento parcial/envenenado).
+            // Reaproveitar esse estado gera 401 determinístico em loop.
+            // Documentação oficial: 401 exige sessão fresca → backup + pasta vazia.
+            try {
+              const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+              const backupDir = `${AUTH_DIR}-partial-${stamp}`;
+              if (fs.existsSync(AUTH_DIR)) {
+                fs.renameSync(AUTH_DIR, backupDir);
+              }
+              fs.mkdirSync(AUTH_DIR, { recursive: true });
+              console.log(`[whatsapp] 401 sem sessão estabelecida — auth parcial arquivado em ${backupDir}, recomeçando do zero.`);
+            } catch (e) {
+              console.error('[whatsapp] Erro ao rotacionar wa-auth parcial:', e.message);
+            }
+            this.reconnectDelayMs = 15000;
+            this.reconnectTimer = setTimeout(() => this.connect(), 15000);
           } else if (qrRefsEnded) {
             // WhatsApp bloqueou novas tentativas de QR por excesso de tentativas.
             // Cooldown longo (10 min) para não piorar o rate-limit.
