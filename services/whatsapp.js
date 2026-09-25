@@ -67,6 +67,26 @@ class WhatsAppService {
     return new Promise(r => setTimeout(r, ms));
   }
 
+  // Remove o "me" pré-setado pelo requestPairingCode (pareamento incompleto),
+  // restaurando o fluxo de registro na próxima conexão. Não mexe em creds de
+  // pareamento real (que têm `account` preenchido pelo configureSuccessfulPairing).
+  stripPairingCodeCreds() {
+    try {
+      const credsPath = path.join(AUTH_DIR, 'creds.json');
+      if (fs.existsSync(credsPath)) {
+        const c = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+        if (c.me && !c.account && !c.registered) {
+          delete c.me;
+          delete c.pairingCode;
+          fs.writeFileSync(credsPath, JSON.stringify(c, null, '\t'));
+          console.log('[whatsapp] Creds de pairing code incompleto limpos (me/pairingCode) — fluxo de registro restaurado.');
+        }
+      }
+    } catch (e) {
+      console.error('[whatsapp] Erro ao limpar creds de pairing code:', e.message);
+    }
+  }
+
   // Pareamento por código de 8 dígitos (alternativa mais robusta ao QR):
   // o código vale minutos, não queima QR refs e completa na MESMA conexão.
   async requestPairingCode(phone) {
@@ -285,6 +305,13 @@ class WhatsAppService {
             console.log('[whatsapp] Restart requerido pelo servidor — reconectando em 2s (completando login pós-pareamento).');
             this.reconnectDelayMs = 15000;
             this.reconnectTimer = setTimeout(() => this.connect(), 2000);
+          } else if (qrRefsEnded && Date.now() < this.pairingWindowUntil) {
+            // QR refs esgotaram DURANTE a janela de pareamento (código emitido / QR em tela).
+            // Cooldown de 10min mataria o pareamento: reconexão rápida + fluxo de
+            // registro limpo, para o usuário gerar um novo código imediatamente.
+            this.stripPairingCodeCreds();
+            console.log('[whatsapp] QR refs esgotados durante janela de pareamento — reconectando em 3s (gere novo código).');
+            this.reconnectTimer = setTimeout(() => this.connect(), 3000);
           } else if (qrRefsEnded) {
             // WhatsApp bloqueou novas tentativas de QR por excesso de tentativas.
             // Cooldown longo (10 min) para não piorar o rate-limit.
