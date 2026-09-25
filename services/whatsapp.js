@@ -30,6 +30,7 @@ class WhatsAppService {
     this.reconnectDelayMs = 15000;
     this.disconnectCount = 0;
     this.consecutiveFailures = 0;
+    this.sessionEstablished = false;
     this.lastStatusCode = null;
     this.pendingAcks = new Map();
     this.ackTimeoutMs = DEFAULT_ACK_TIMEOUT_MS;
@@ -174,6 +175,7 @@ class WhatsAppService {
           this.phoneNumber = this.sock.user?.id?.split(':')[0] || null;
           this.reconnectDelayMs = 15000;
           this.consecutiveFailures = 0;
+          this.sessionEstablished = true;
           this.manualReconnect = false;
           this.emitStatus();
           // Processar fila ao conectar
@@ -206,8 +208,9 @@ class WhatsAppService {
             this.sock = null;
           }
 
-          if (isLoggedOut) {
-            console.log('[whatsapp] Sessão inválida (loggedOut) — limpando credenciais...');
+          if (isLoggedOut && this.sessionEstablished) {
+            console.log('[whatsapp] Sessão inválida (loggedOut) após sessão estabelecida — limpando credenciais...');
+            this.sessionEstablished = false;
             try {
               if (fs.existsSync(AUTH_DIR)) {
                 const files = fs.readdirSync(AUTH_DIR);
@@ -219,7 +222,14 @@ class WhatsAppService {
               console.error('[whatsapp] Erro ao limpar wa-auth:', e.message);
             }
             this.consecutiveFailures = 0;
-            this.reconnectTimer = setTimeout(() => this.connect(), 5000);
+            this.reconnectDelayMs = 15000;
+            this.reconnectTimer = setTimeout(() => this.connect(), 15000);
+          } else if (isLoggedOut) {
+            // 401 numa sessão que NUNCA conectou (ex.: pareamento fresco rejeitado).
+            // NÃO apaga o wa-auth: preserva o estado e tenta de novo com backoff.
+            console.log('[whatsapp] 401 em sessão nunca estabelecida — mantendo wa-auth, nova tentativa com backoff.');
+            this.reconnectTimer = setTimeout(() => this.connect(), Math.min(this.reconnectDelayMs, 60000));
+            this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 300000);
           } else if (qrRefsEnded) {
             // WhatsApp bloqueou novas tentativas de QR por excesso de tentativas.
             // Cooldown longo (10 min) para não piorar o rate-limit.
@@ -267,6 +277,7 @@ class WhatsAppService {
       } catch (e) { /* ignore */ }
       this.sock = null;
     }
+    this.sessionEstablished = false;
     this.status = 'disconnected';
     this.qrDataUrl = null;
     this.phoneNumber = null;
