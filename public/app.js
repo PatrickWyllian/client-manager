@@ -894,6 +894,24 @@ document.getElementById('btn-wa-disconnect').addEventListener('click', async () 
   try { await api('/whatsapp/disconnect', { method: 'POST' }); toast('WhatsApp desconectado.'); } catch (err){ toast(err.message, true); }
 });
 
+// ---------- PAREAMENTO POR CÓDIGO ----------
+document.getElementById('btn-wa-pairing').addEventListener('click', async () => {
+  const phone = document.getElementById('wa-pairing-phone').value.trim();
+  const box = document.getElementById('wa-pairing-code-box');
+  const codeEl = document.getElementById('wa-pairing-code');
+  if (!phone) { toast('Informe o número da conta WhatsApp.', true); return; }
+  codeEl.textContent = '...';
+  box.style.display = 'block';
+  try {
+    const r = await api('/whatsapp/pairing-code', { method: 'POST', body: JSON.stringify({ phone }) });
+    codeEl.textContent = (r.pairingCode || '').replace(/(.{4})/, '$1-');
+    toast('Código gerado! Digite no WhatsApp → Aparelhos conectados → Conectar com número de telefone.');
+  } catch (err) {
+    box.style.display = 'none';
+    toast(err.message, true);
+  }
+});
+
 // ---------- RECUPERAÇÃO ----------
 window.sendRecovery = async (id, name) => {
   if (!await confirmDialog(`Enviar mensagem de recuperação para ${name}?`, { title: 'Enviar recuperação' })) return;

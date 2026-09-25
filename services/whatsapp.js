@@ -36,6 +36,7 @@ class WhatsAppService {
     this.ackTimeoutMs = DEFAULT_ACK_TIMEOUT_MS;
     this.lastQrTime = 0;
     this.manualReconnect = false;
+    this.pairingWindowUntil = 0;
   }
 
   setQueue(queue) {
@@ -60,6 +61,38 @@ class WhatsAppService {
     // Baileys nesta versão não expõe readyState no objeto ws.
     // "Conectado de verdade" é sinalizado pelo evento connection: open.
     return this.status === 'connected' && !!this.sock;
+  }
+
+  async sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  // Pareamento por código de 8 dígitos (alternativa mais robusta ao QR):
+  // o código vale minutos, não queima QR refs e completa na MESMA conexão.
+  async requestPairingCode(phone) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) throw new Error('Telefone inválido.');
+    if (this.status === 'connected') throw new Error('WhatsApp já está conectado.');
+
+    // Garante um socket na fase de pareamento (status 'qr' = handshake concluído)
+    if (this.status !== 'qr' || !this.sock) {
+      if (this.status !== 'connecting') {
+        this.connect(true); // manual: reseta backoff/circuit breaker
+      }
+      const deadline = Date.now() + 25000;
+      while ((this.status !== 'qr' || !this.sock) && Date.now() < deadline) {
+        await this.sleep(500);
+      }
+      if (this.status !== 'qr' || !this.sock) {
+        throw new Error('WhatsApp não chegou à fase de pareamento a tempo. Clique em "Conectar" e tente de novo.');
+      }
+    }
+
+    // Janela de pareamento: 5 min para digitar o código no celular
+    this.pairingWindowUntil = Date.now() + 5 * 60 * 1000;
+    const code = await this.sock.requestPairingCode(normalized);
+    console.log(`[whatsapp] Código de pareamento gerado para ${normalized} — digite no celular em até 5 minutos.`);
+    return code;
   }
 
   async connect(manual = false) {
@@ -96,7 +129,7 @@ class WhatsAppService {
 
       this.sock = makeWASocket({
         version,
-        browser: Browsers.ubuntu('Chrome'),
+        browser: Browsers.macOS('Chrome'),
         auth: state,
         logger: pino({ level: 'fatal' }),
         printQRInTerminal: false,
@@ -166,6 +199,9 @@ class WhatsAppService {
           this.qrDataUrl = await QRCode.toDataURL(qr);
           this.status = 'qr';
           this.lastQrTime = Date.now();
+          // Janela de pareamento: preserva ciclo rápido de reconexão enquanto
+          // o QR está em tela (o usuário pode estar escaneando agora).
+          this.pairingWindowUntil = Date.now() + 5 * 60 * 1000;
           this.emitStatus();
         }
 
@@ -240,23 +276,33 @@ class WhatsAppService {
               console.error('[whatsapp] Erro ao rotacionar wa-auth parcial:', e.message);
             }
             this.reconnectDelayMs = 15000;
-            this.reconnectTimer = setTimeout(() => this.connect(), 15000);
+            const inWindow = Date.now() < this.pairingWindowUntil;
+            this.reconnectTimer = setTimeout(() => this.connect(), inWindow ? 5000 : 15000);
+          } else if (statusCode === DisconnectReason.restartRequired) {
+            // 515 "restart required" = fluxo NORMAL pós-pareamento: o servidor
+            // aceitou a vinculação e pede reconexão IMEDIATA para completar o login.
+            // Esperar demais faz o registro pendente expirar → 401 Connection Failure.
+            console.log('[whatsapp] Restart requerido pelo servidor — reconectando em 2s (completando login pós-pareamento).');
+            this.reconnectDelayMs = 15000;
+            this.reconnectTimer = setTimeout(() => this.connect(), 2000);
           } else if (qrRefsEnded) {
             // WhatsApp bloqueou novas tentativas de QR por excesso de tentativas.
             // Cooldown longo (10 min) para não piorar o rate-limit.
             console.log('[whatsapp] QR rate-limit atingido — aguardando 10min antes de tentar de novo.');
             this.reconnectDelayMs = 600000;
             this.reconnectTimer = setTimeout(() => this.connect(), 600000);
-          } else if (this.consecutiveFailures >= 10 && !this.manualReconnect) {
+          } else if (this.consecutiveFailures >= 10 && !this.manualReconnect && Date.now() >= this.pairingWindowUntil) {
             // Circuit breaker: após 10 falhas seguidas, para de reconectar sozinho.
-            // Evita queimar tentativas de QR e força intervenção manual via painel.
             console.log('[whatsapp] Circuit breaker: 10 falhas seguidas — reconexão automática pausada. Use "Conectar" no painel.');
             this.status = 'failed';
             this.emitStatus();
+          } else if (Date.now() < this.pairingWindowUntil) {
+            // Janela de pareamento ativa (QR em tela ou código emitido):
+            // reconexão rápida preserva o pareamento em andamento.
+            console.log('[whatsapp] Janela de pareamento ativa — reconectando em 5s.');
+            this.reconnectTimer = setTimeout(() => this.connect(), 5000);
           } else {
             // Backoff exponencial com base maior (15s → 30s → 60s ... máx 5min).
-            // Se um QR foi gerado há menos de 90s, espera pelo menos 90s para
-            // dar tempo do usuário escanear antes de invalidá-lo com novo QR.
             const sinceQr = Date.now() - (this.lastQrTime || 0);
             const qrCooldown = this.lastQrTime ? Math.max(0, 90000 - sinceQr) : 0;
             const delay = Math.max(
