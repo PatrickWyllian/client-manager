@@ -61,6 +61,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('post_expiry_schedule_enable
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_hour', '11');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_minute', '40');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_enabled', '1');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('audit_log_retention_days', '90');
 
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS message_queue (
   type TEXT NOT NULL DEFAULT 'manual',
   status TEXT NOT NULL DEFAULT 'pending',
   priority INTEGER DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   scheduled_at TEXT,
   sent_at TEXT,
   error TEXT,

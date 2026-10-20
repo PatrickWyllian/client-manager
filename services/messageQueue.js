@@ -56,17 +56,18 @@ class MessageQueue extends EventEmitter {
     // Recupera filas presas em 'sending' (processo caiu ANTES de confirmar a
     // escrita no socket) e as devolve a 'pending' para nova tentativa.
     //
-    // TZ (correcao): message_queue.created_at e gravado em UTC (DEFAULT
-    // datetime('now') - o valor real da coluna em producao), enquanto
-    // datetime('now','localtime') retorna horario de Sao_Paulo (UTC-3).
-    // Comparar UTC contra localtime atrasava a recuperacao em ~3h. Agora a
-    // comparacao e feita no MESMO fuso (UTC) nas duas pontas.
+    // TZ: created_at é gravado em horário local (datetime('now','localtime'),
+    // TZ=America/Sao_Paulo). A comparação precisa ser feita no MESMO fuso —
+    // por isso comparamos o texto de created_at diretamente com
+    // datetime('now','localtime', '-30 minutes'), sem envolver created_at em
+    // datetime() (que reinterpretaria a string local como UTC e deslocaria a
+    // janela em -3h).
     db.prepare(`
       UPDATE message_queue
       SET status = 'pending'
       WHERE status = 'sending'
         AND (attempts IS NULL OR attempts < ?)
-        AND datetime(created_at) <= datetime('now', ?)
+        AND created_at <= datetime('now', 'localtime', ?)
     `).run(MAX_ATTEMPTS, `-${Math.floor(STALE_MS / 60000)} minutes`);
 
     // Se estiver fora do horário comercial para envios automáticos, aguardar

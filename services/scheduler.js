@@ -47,6 +47,13 @@ function startScheduledJobs(waService, io) {
   });
   console.log('[scheduler] Expiração automática agendada para 00:05.');
 
+  // Retenção da trilha de auditoria (LGPD-06): poda diária às 03:30.
+  const auditRetentionExpr = '30 3 * * *';
+  scheduledJobs.auditRetention = cron.schedule(auditRetentionExpr, () => {
+    pruneAuditLog();
+  });
+  console.log('[scheduler] Retenção de audit_log agendada para 03:30.');
+
   if (schedules.reminder.enabled) {
     const cronExpr = `${schedules.reminder.minute} ${schedules.reminder.hour} * * *`;
     scheduledJobs.reminder = cron.schedule(cronExpr, () => {
@@ -81,6 +88,29 @@ function startScheduledJobs(waService, io) {
 
 function restartScheduler(waService, io) {
   startScheduledJobs(waService, io);
+}
+
+// RETENÇÃO (LGPD-06): poda a trilha de auditoria. Mantém os últimos N dias
+// (setting `audit_log_retention_days`, default 90; <=0 desativa). Idempotente,
+// roda 1x/dia e nunca derruba o app (try/catch).
+function pruneAuditLog() {
+  const days = parseInt(getSetting('audit_log_retention_days', '90'), 10);
+  if (!Number.isFinite(days) || days <= 0) {
+    console.log('[scheduler] Retenção de audit_log desativada (audit_log_retention_days <= 0).');
+    return 0;
+  }
+  try {
+    const result = db.prepare(
+      "DELETE FROM audit_log WHERE created_at < datetime('now', 'localtime', ?)",
+    ).run(`-${days} days`);
+    if (result.changes > 0) {
+      console.log(`[scheduler] Retenção audit_log: ${result.changes} registro(s) com mais de ${days} dias removido(s).`);
+    }
+    return result.changes;
+  } catch (err) {
+    console.error('[scheduler] Falha ao podar audit_log:', err.message);
+    return 0;
+  }
 }
 
 function expireOverdueClients() {
@@ -377,6 +407,7 @@ module.exports = {
   runReminderCheck,
   runRecoveryCheck,
   runPostExpiryCheck,
+  pruneAuditLog,
   sendWelcomeMessage,
   recordNotification,
   buildWelcomeMessage,

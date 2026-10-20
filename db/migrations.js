@@ -95,7 +95,7 @@ function runMigrations() {
       type TEXT NOT NULL DEFAULT 'manual',
       status TEXT NOT NULL DEFAULT 'pending',
       priority INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       scheduled_at TEXT,
       sent_at TEXT,
       error TEXT,
@@ -178,6 +178,9 @@ function runMigrations() {
   db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_username ON audit_log(username)");
+
+  // RETENÇÃO (LGPD-06): default configurável do prazo de retenção da trilha.
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('audit_log_retention_days', '90')").run();
 }
 
 module.exports = runMigrations;
