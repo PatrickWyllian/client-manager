@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 
+// APP-04: JWT_SECRET e obrigatorio - sem fallback.
+// A ausencia deve interromper o startup (fail loudly), nunca degradar para um
+// segredo conhecido publicamente. O valor chega via Docker Secrets no wrapper
+// entrypoint-secrets.sh, que tambem falha se o secret nao existir.
 if (!process.env.JWT_SECRET) {
   console.error('[auth] ERRO CRÍTICO: JWT_SECRET não definido no ambiente. Encerrando.');
   process.exit(1);

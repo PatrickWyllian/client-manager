@@ -1,6 +1,9 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Toolchain para módulos nativos (better-sqlite3) quando não há prebuild
+RUN apk add --no-cache python3 make g++
+
 # Timezone Brasil
 RUN apk add --no-cache tzdata && \
     cp /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && \
@@ -35,7 +38,19 @@ RUN npm ci --only=production
 
 COPY --from=builder /app .
 
-RUN mkdir -p /app/data
+# APP-02: /app/data gravavel pelo usuario node (uid 1000); codigo fica root-owned
+RUN mkdir -p /app/data && chown -R node:node /app/data
+
+# Entrypoint: carrega Docker Secrets antes de subir o app. O servico no Swarm
+# sobrescreve via Command (/opt/client-manager/entrypoint-secrets.sh), entao
+# este ENTRYPOINT e apenas o default compativel da imagem.
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod 755 /entrypoint.sh
+
+# APP-02: container nao-roda-como-root (imagem node oficial tem usuario 'node')
+USER node
+
+ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 3400
 

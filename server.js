@@ -69,8 +69,28 @@ io.use((socket, next) => {
 });
 
 // Security middleware
+// APP-03: CSP ativa. script-src mantem 'unsafe-inline' TEMPORARIAMENTE: app.js
+// injeta onclick="..." com conteudo dinamico (11 sites, linhas ~130-722) e
+// login.html tem um <script> inline - hashes/nonce exigiriam refactor para
+// event delegation. Demais diretivas sao restritivas.
+// CSP_REPORT_ONLY=1 no servico emite apenas o header -Report-Only (rollout).
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-inline'"],
+  styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+  fontSrc: ["'self'", "https://fonts.gstatic.com"],
+  imgSrc: ["'self'", "data:", "blob:"],
+  connectSrc: ["'self'", "wss:"],
+  objectSrc: ["'none'"],
+  baseUri: ["'self'"],
+  formAction: ["'self'"],
+  frameAncestors: ["'none'"],
+  upgradeInsecureRequests: []
+};
+const cspOptions = { useDefaults: false, directives: cspDirectives };
+if (process.env.CSP_REPORT_ONLY === '1') cspOptions.reportOnly = true;
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: cspOptions,
   crossOriginEmbedderPolicy: false,
   hsts: {
     maxAge: 31536000,
@@ -138,6 +158,8 @@ app.use('/api/sales', require('./routes/sales'));
 app.use('/api/settings', require('./routes/settings')(waService, io));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/resellers', require('./routes/resellers'));
+// AUDIT-01 (LGPD-06): leitura da trilha de auditoria
+app.use('/api/audit', require('./routes/audit'));
 
 // Health check endpoint (para Swarm/Traefik) - DEVE vir ANTES do catch-all
 app.get('/healthz', (req, res) => {
