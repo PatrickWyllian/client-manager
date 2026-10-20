@@ -86,3 +86,22 @@ CREATE TABLE IF NOT EXISTS message_queue (
   error TEXT,
   FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
 );
+
+-- AUDIT-01 (LGPD-06): trilha de auditoria de acoes administrativas.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  username TEXT,
+  action TEXT NOT NULL,
+  resource_type TEXT,
+  resource_id TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  status TEXT NOT NULL DEFAULT 'success',
+  details TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_username ON audit_log(username);

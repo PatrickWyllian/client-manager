@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 const { NotFoundError, ValidationError } = require('../lib/errors');
 const { validateServer } = require('../lib/validators');
+const { logAudit } = require('../lib/audit');
 
 // Listar todos os servidores (com contagem de clientes)
 router.get('/', (req, res) => {
@@ -38,6 +39,15 @@ router.post('/', (req, res, next) => {
     );
     const info = stmt.run(name.trim(), provider || null, cost || 0, status || 'ativo', notes || null);
     const server = db.prepare('SELECT * FROM servers WHERE id = ?').get(info.lastInsertRowid);
+
+    logAudit({
+      req,
+      action: 'server.create',
+      resourceType: 'server',
+      resourceId: server.id,
+      details: { name: server.name, provider: server.provider, cost: server.cost, status: server.status },
+    });
+
     res.status(201).json(server);
   } catch (err) {
     next(err);
@@ -62,6 +72,20 @@ router.put('/:id', (req, res, next) => {
       req.params.id,
     );
     const updated = db.prepare('SELECT * FROM servers WHERE id = ?').get(req.params.id);
+
+    const changes = {};
+    for (const key of ['name', 'provider', 'cost', 'status', 'notes']) {
+      if (updated[key] !== existing[key]) changes[key] = { from: existing[key], to: updated[key] };
+    }
+
+    logAudit({
+      req,
+      action: 'server.update',
+      resourceType: 'server',
+      resourceId: req.params.id,
+      details: { changes },
+    });
+
     res.json(updated);
   } catch (err) {
     next(err);
@@ -79,6 +103,15 @@ router.delete('/:id', (req, res, next) => {
       throw new ValidationError(`Não é possível excluir: ${clientCount} cliente(s) vinculado(s) a este servidor.`);
     }
     db.prepare('DELETE FROM servers WHERE id = ?').run(req.params.id);
+
+    logAudit({
+      req,
+      action: 'server.delete',
+      resourceType: 'server',
+      resourceId: req.params.id,
+      details: { name: existing.name, provider: existing.provider },
+    });
+
     res.status(204).send();
   } catch (err) {
     next(err);

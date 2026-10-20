@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const db = require('../db/database');
 const { generateToken } = require('../middleware/auth');
+const { logAudit } = require('../lib/audit');
 
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
@@ -12,11 +13,25 @@ router.post('/login', (req, res) => {
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user) {
+    logAudit({
+      req,
+      action: 'auth.login',
+      resourceType: 'session',
+      status: 'failure',
+      details: { username, reason: 'unknown_user' },
+    });
     return res.status(401).json({ error: 'Credenciais inválidas.' });
   }
 
   const valid = bcrypt.compareSync(password, user.password);
   if (!valid) {
+    logAudit({
+      req,
+      action: 'auth.login',
+      resourceType: 'session',
+      status: 'failure',
+      details: { username, reason: 'bad_password' },
+    });
     return res.status(401).json({ error: 'Credenciais inválidas.' });
   }
 
@@ -29,11 +44,34 @@ router.post('/login', (req, res) => {
     maxAge: 24 * 60 * 60 * 1000, // 24h
   });
 
+  logAudit({
+    req,
+    user: { id: user.id, username: user.username },
+    action: 'auth.login',
+    resourceType: 'session',
+    resourceId: user.id,
+    details: { username: user.username },
+  });
+
   res.json({ ok: true, username: user.username });
 });
 
 router.post('/logout', (req, res) => {
+  // /api/auth nao passa pelo authMiddleware, entao decodificamos o cookie
+  // (best-effort) apenas para identificar quem saiu na trilha de auditoria.
+  let user = null;
+  try {
+    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      const jwt = require('jsonwebtoken');
+      const { JWT_SECRET } = require('../middleware/auth');
+      const decoded = jwt.verify(token, JWT_SECRET);
+      user = { id: decoded.id, username: decoded.username };
+    }
+  } catch { /* token ausente/invalido: registra logout anonimo */ }
+
   res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'lax' });
+  logAudit({ req, user, action: 'auth.logout', resourceType: 'session' });
   res.json({ ok: true });
 });
 

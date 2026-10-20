@@ -6,6 +6,7 @@ const { daysUntil, formatDate, addMonthsPreservingDay } = require('../lib/dateHe
 const { encryptText, decryptText } = require('../lib/crypto');
 const { NotFoundError, ValidationError } = require('../lib/errors');
 const { validateClient } = require('../lib/validators');
+const { logAudit } = require('../lib/audit');
 
 module.exports = (waService) => {
   // Listar clientes (com filtros opcionais: server_id, status, plan, filter_name)
@@ -118,6 +119,23 @@ module.exports = (waService) => {
       const newClientId = createTransaction();
       const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(newClientId);
 
+      logAudit({
+        req,
+        action: 'client.create',
+        resourceType: 'client',
+        resourceId: client.id,
+        details: {
+          name: client.name,
+          phone: client.phone,
+          plan: client.plan,
+          price: client.price,
+          discount: client.discount,
+          server_id: client.server_id,
+          due_date: client.due_date,
+          status: client.status,
+        },
+      });
+
       // Enviar mensagem de boas-vindas via WhatsApp
       if (waService && client.status === 'ativo') {
         try {
@@ -190,6 +208,27 @@ module.exports = (waService) => {
         req.params.id,
       );
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+
+      // Trilha de auditoria: registra quais campos mudaram (nunca o valor da senha).
+      const candidates = ['name', 'phone', 'plan', 'price', 'discount', 'server_id', 'due_date', 'status', 'username', 'notes'];
+      const changes = {};
+      for (const key of candidates) {
+        if (updated[key] !== existing[key]) {
+          changes[key] = { from: existing[key], to: updated[key] };
+        }
+      }
+      if (encPassword !== existing.password) {
+        changes.password = '[REDACTED]';
+      }
+
+      logAudit({
+        req,
+        action: 'client.update',
+        resourceType: 'client',
+        resourceId: req.params.id,
+        details: { changes },
+      });
+
       res.json({
         ...updated,
         password: updated.password ? decryptText(updated.password) : null,
@@ -236,6 +275,14 @@ module.exports = (waService) => {
 
       renewTransaction();
 
+      logAudit({
+        req,
+        action: 'client.renew',
+        resourceType: 'client',
+        resourceId: client.id,
+        details: { renewal_date, previous_due_date: client.due_date, new_due_date: newDue, months, value: renewValue },
+      });
+
       const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(client.id);
 
       // Enfileirar mensagem de renovação
@@ -269,6 +316,15 @@ module.exports = (waService) => {
       const existing = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
       if (!existing) throw new NotFoundError('Cliente não encontrado.');
       db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
+
+      logAudit({
+        req,
+        action: 'client.delete',
+        resourceType: 'client',
+        resourceId: req.params.id,
+        details: { name: existing.name, phone: existing.phone, plan: existing.plan, status: existing.status },
+      });
+
       res.status(204).send();
     } catch (err) {
       next(err);
