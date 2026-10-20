@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { formatDate, formatMonth } = require('../lib/dateHelpers');
+const { logAudit } = require('../lib/audit');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function notFound(res, msg = 'Não encontrado.') {
@@ -53,6 +54,15 @@ router.post('/', (req, res) => {
   ).run(name.trim(), phone || null, email || null, notes || null, status || 'ativo');
 
   const created = db.prepare('SELECT * FROM resellers WHERE id = ?').get(info.lastInsertRowid);
+
+  logAudit({
+    req,
+    action: 'reseller.create',
+    resourceType: 'reseller',
+    resourceId: created.id,
+    details: { name: created.name, phone: created.phone, email: created.email, status: created.status },
+  });
+
   res.status(201).json(created);
 });
 
@@ -73,7 +83,22 @@ router.put('/:id', (req, res) => {
     req.params.id,
   );
 
-  res.json(db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id));
+  const updated = db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id);
+
+  const changes = {};
+  for (const key of ['name', 'phone', 'email', 'status']) {
+    if (updated[key] !== existing[key]) changes[key] = { from: existing[key], to: updated[key] };
+  }
+
+  logAudit({
+    req,
+    action: 'reseller.update',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { changes },
+  });
+
+  res.json(updated);
 });
 
 // DELETE /api/resellers/:id — excluir
@@ -81,6 +106,15 @@ router.delete('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id);
   if (!existing) return notFound(res, 'Revendedor não encontrado.');
   db.prepare('DELETE FROM resellers WHERE id = ?').run(req.params.id);
+
+  logAudit({
+    req,
+    action: 'reseller.delete',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { name: existing.name, email: existing.email, status: existing.status },
+  });
+
   res.status(204).send();
 });
 
@@ -174,6 +208,21 @@ router.post('/purchases', (req, res) => {
     WHERE p.id = ?
   `).get(info.lastInsertRowid);
 
+  logAudit({
+    req,
+    action: 'reseller.purchase',
+    resourceType: 'reseller_purchase',
+    resourceId: created.id,
+    details: {
+      reseller_id: created.reseller_id,
+      server_id: created.server_id,
+      credits_qty: created.credits_qty,
+      amount_paid: created.amount_paid,
+      cost_per_credit: created.cost_per_credit,
+      purchase_date: created.purchase_date,
+    },
+  });
+
   res.status(201).json(created);
 });
 
@@ -207,6 +256,20 @@ router.put('/purchases/:id', (req, res) => {
     WHERE p.id = ?
   `).get(req.params.id);
 
+  logAudit({
+    req,
+    action: 'reseller.purchase_update',
+    resourceType: 'reseller_purchase',
+    resourceId: req.params.id,
+    details: {
+      reseller_id: updated.reseller_id,
+      credits_qty: updated.credits_qty,
+      amount_paid: updated.amount_paid,
+      cost_per_credit: updated.cost_per_credit,
+      purchase_date: updated.purchase_date,
+    },
+  });
+
   res.json(updated);
 });
 
@@ -215,6 +278,20 @@ router.delete('/purchases/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM reseller_credit_purchases WHERE id = ?').get(req.params.id);
   if (!existing) return notFound(res, 'Compra não encontrada.');
   db.prepare('DELETE FROM reseller_credit_purchases WHERE id = ?').run(req.params.id);
+
+  logAudit({
+    req,
+    action: 'reseller.purchase_delete',
+    resourceType: 'reseller_purchase',
+    resourceId: req.params.id,
+    details: {
+      reseller_id: existing.reseller_id,
+      credits_qty: existing.credits_qty,
+      amount_paid: existing.amount_paid,
+      purchase_date: existing.purchase_date,
+    },
+  });
+
   res.status(204).send();
 });
 

@@ -53,15 +53,21 @@ class MessageQueue extends EventEmitter {
   async _processNext() {
     if (this.processing) return;
 
-    // Recupera filas presas em 'sending' (processo caiu antes do ack/timeout)
-    // e as devolve a 'pending' para nova tentativa (com limite de attempts).
+    // Recupera filas presas em 'sending' (processo caiu ANTES de confirmar a
+    // escrita no socket) e as devolve a 'pending' para nova tentativa.
+    //
+    // TZ: created_at é gravado em horário local (datetime('now','localtime'),
+    // TZ=America/Sao_Paulo). A comparação precisa ser feita no MESMO fuso —
+    // por isso comparamos o texto de created_at diretamente com
+    // datetime('now','localtime', '-30 minutes'), sem envolver created_at em
+    // datetime() (que reinterpretaria a string local como UTC e deslocaria a
+    // janela em -3h).
     db.prepare(`
       UPDATE message_queue
       SET status = 'pending'
       WHERE status = 'sending'
         AND (attempts IS NULL OR attempts < ?)
-        AND datetime(created_at) < datetime('now', 'localtime', ?
-      )
+        AND created_at <= datetime('now', 'localtime', ?)
     `).run(MAX_ATTEMPTS, `-${Math.floor(STALE_MS / 60000)} minutes`);
 
     // Se estiver fora do horário comercial para envios automáticos, aguardar
@@ -105,8 +111,10 @@ class MessageQueue extends EventEmitter {
       // Aplica Spintax nas mensagens para variação anti-spam
       const finalMessage = parseSpintax(pending.message);
 
-      // sendMessage agora aguarda o ACK real do servidor (SERVER_ACK+).
-      // Se o WhatsApp não confirmar, lança erro e NÃO marcamos como enviada.
+      // sendMessage resolve ASSIM QUE o socket confirma a escrita (key.id).
+      // O ack é telemetria: um timeout de ack NÃO lança mais erro aqui e,
+      // portanto, NÃO reenfileira. Só falhas PRÉ-dispatch (socket fechado /
+      // escrita não concluída) chegam ao catch abaixo.
       await this.waService.sendMessage(pending.phone, finalMessage);
 
       db.prepare(
@@ -144,12 +152,14 @@ class MessageQueue extends EventEmitter {
 
       const attempts = (pending.attempts || 0) + 1;
 
-      // Envio não confirmado: tenta de novo (com limite), sem dar falso "enviada".
+      // Chegamos aqui apenas em falha PRÉ-dispatch (socket indisponível ou
+      // sendMessage lançou antes de devolver key.id). Timeout de ack nunca
+      // cai neste ramo: é telemetria e o envio já foi marcado como 'sent'.
       if (attempts < MAX_ATTEMPTS) {
         db.prepare(
           "UPDATE message_queue SET status = 'pending', attempts = ? WHERE id = ?"
         ).run(attempts, pending.id);
-        this.logger.warn({ attempts, maxAttempts: MAX_ATTEMPTS, phone: pending.phone }, 'Reenfileirando');
+        this.logger.warn({ attempts, maxAttempts: MAX_ATTEMPTS, phone: pending.phone }, 'Reenfileirando (falha pré-dispatch)');
         this.emit('queue:requeued', { ...pending, attempts });
       } else {
         db.prepare(

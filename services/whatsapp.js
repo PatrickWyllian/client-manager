@@ -209,8 +209,10 @@ class WhatsAppService {
 
       this.sock.ev.on('creds.update', saveCreds);
 
-      // Rastreia acks reais (messages.update) para confirmar entrega de verdade.
-      // Sem isso, Baileys resolve ao escrever no socket mesmo que o WhatsApp nunca receba.
+      // Rastreia acks reais (messages.update) para a TELEMETRIA de entrega.
+      // ATENÇÃO: o ack NÃO é gatilho de reenvio. O envio é confirmado no
+      // sendMessage() assim que o socket devolve key.id; o ack apenas atualiza
+      // os contadores internos (pendingAcks) e nunca reprova/reprocessa a fila.
       this.sock.ev.on('messages.update', (updates) => {
         for (const { key, update } of updates || []) {
           if (!key || !key.id) continue;
@@ -220,18 +222,13 @@ class WhatsAppService {
           const pending = this.pendingAcks.get(key.id);
           if (!pending) continue;
           // Ignora PENDING (1) - é apenas o primeiro update ao escrever no socket.
-          // Aguarda SERVER_ACK (2) ou superior para confirmar entrega.
           if (status === proto.WebMessageInfo.Status.PENDING) {
             continue;
           }
           clearTimeout(pending.timer);
           this.pendingAcks.delete(key.id);
-          // Rejeita apenas em ERROR (0), resolve em SERVER_ACK (2) ou superior.
-          if (status === proto.WebMessageInfo.Status.ERROR) {
-            pending.reject(new Error(`WhatsApp não confirmou a mensagem (ack status ${status}).`));
-          } else {
-            pending.resolve(status);
-          }
+          // Telemetria: registra o ack final sem jamais rejeitar o envio.
+          pending.onAck(status);
         }
       });
 
@@ -252,12 +249,7 @@ class WhatsAppService {
           }
           clearTimeout(pending.timer);
           this.pendingAcks.delete(key.id);
-          // Rejeita apenas em ERROR (0), resolve em SERVER_ACK (2) ou superior.
-          if (status === proto.WebMessageInfo.Status.ERROR) {
-            pending.reject(new Error(`WhatsApp não confirmou a mensagem (ack status ${status}).`));
-          } else {
-            pending.resolve(status);
-          }
+          pending.onAck(status);
         }
       });
 
@@ -430,8 +422,11 @@ class WhatsAppService {
     };
   }
 
-  // Envia e aguarda ack real do servidor (SERVER_ACK ou superior).
-  // Gabarito de "enviado com sucesso": WhatsApp confirmou, não apenas socket abriu.
+  // Envia a mensagem e retorna ASSIM QUE o socket confirma a escrita (key.id).
+  // O ack do servidor (SERVER_ACK/READ) é TELEMETRIA — nunca bloqueia o envio
+  // nem reprova a fila. Este era o bug das 3 mensagens: aguardar o ack e, no
+  // timeout, reenfileirar fazia o destinatário receber duplicatas (o socket já
+  // havia entregue a mensagem nas tentativas anteriores).
   async sendMessage(phone, text) {
     if (this.status !== 'connected' || !this.sock) {
       throw new Error('WhatsApp não está conectado.');
@@ -458,33 +453,47 @@ class WhatsAppService {
     try {
       result = await this.sock.sendMessage(jid, { text });
     } catch (err) {
-      // Captura o erro real do Baileys para não mascarar como "enviado"
+      // Falha PRÉ-dispatch (escrita no socket não completou): propaga para a
+      // fila, que decide reenfileirar. É o único caso que reenfileira.
       console.error('[whatsapp] Falha ao enviar mensagem para', jid, '—', err.message);
       throw err;
     }
+
     const msgId = result && result.key && result.key.id;
     if (!msgId) {
+      // Socket aceitou mas sem key.id — trata como aceito (escrita concluída).
       return result;
     }
+
     // Guarda o texto para o getMessage() atender retries futuros.
-    // Limite de 1000 entras (evita crescimento indefinido em memória).
+    // Limite de 1000 entradas (evita crescimento indefinido em memória).
     this.recentMessages.set(msgId, text);
     if (this.recentMessages.size > 1000) {
       const oldest = this.recentMessages.keys().next().value;
       this.recentMessages.delete(oldest);
     }
-    const status = await this.waitForAck(msgId);
-    return { ...result, ackStatus: status };
+
+    // Registra telemetria de ack (não bloqueia, não rejeita).
+    this.trackAck(msgId);
+
+    // Sucesso de ENVIO = socket aceitou (key.id). Retorna imediatamente.
+    return { ...result, ackStatus: 'queued' };
   }
 
-  waitForAck(msgId, timeoutMs = null) {
-    const timeout = timeoutMs || this.ackTimeoutMs;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingAcks.delete(msgId);
-        reject(new Error('Sem confirmação do WhatsApp (timeout ack).'));
-      }, timeout);
-      this.pendingAcks.set(msgId, { resolve, reject, timer });
+  // Telemetria de ack: observa messages.update/upsert apenas para contabilizar
+  // a confirmação. Nunca resolve/rejeita o fluxo de envio.
+  trackAck(msgId) {
+    const timer = setTimeout(() => {
+      this.pendingAcks.delete(msgId);
+      console.log(`[whatsapp] Telemetria: ack não recebido em ${this.ackTimeoutMs}ms para ${msgId} (envio já confirmado no socket).`);
+    }, this.ackTimeoutMs);
+    this.pendingAcks.set(msgId, {
+      onAck: (status) => {
+        const isError = status === proto.WebMessageInfo.Status.ERROR;
+        console.log(`[whatsapp] Telemetria: ack status ${status}${isError ? ' (ERROR)' : ''} para ${msgId}.`);
+      },
+      timer,
+      telemetry: true,
     });
   }
 }
