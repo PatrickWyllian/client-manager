@@ -95,7 +95,7 @@ function runMigrations() {
       type TEXT NOT NULL DEFAULT 'manual',
       status TEXT NOT NULL DEFAULT 'pending',
       priority INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
       scheduled_at TEXT,
       sent_at TEXT,
       error TEXT,
