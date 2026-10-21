@@ -1,6 +1,17 @@
-# Build stage
+# --- build stage: instala APENAS deps de producao e compila modulos nativos
+# (better-sqlite3) para alpine. Dev deps (jest/eslint) NAO entram na imagem ---
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# --- runtime ---
+FROM node:20-alpine
+
 # Timezone Brasil
 RUN apk add --no-cache tzdata && \
     cp /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && \
@@ -8,34 +19,25 @@ RUN apk add --no-cache tzdata && \
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+# node_modules de producao (compilados no builder)
+COPY --from=builder /app/node_modules ./node_modules
 
-# Install all dependencies (including devDependencies for test)
-RUN npm ci
-
+# Codigo-fonte (node_modules/.git/data-db/data-wa-auth excluidos via .dockerignore)
 COPY . .
 
-# Skip tests in build (run separately in CI)
-# RUN npm test
+# APP-02: /app/data gravavel pelo usuario node (uid 1000); codigo fica root-owned
+RUN mkdir -p /app/data && chown -R node:node /app/data
 
-# Production stage
-FROM node:20-alpine AS production
+# Entrypoint: carrega Docker Secrets antes de subir o app. O servico no Swarm
+# sobrescreve via Command (/opt/client-manager/entrypoint-secrets.sh), entao
+# este ENTRYPOINT e apenas o default compativel da imagem.
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod 755 /entrypoint.sh
 
-# Timezone Brasil
-RUN apk add --no-cache tzdata && \
-    cp /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && \
-    echo "America/Sao_Paulo" > /etc/timezone
+# APP-02: container nao-roda-como-root (imagem node oficial tem usuario 'node')
+USER node
 
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production
-
-COPY --from=builder /app .
-
-RUN mkdir -p /app/data
+ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 3400
 

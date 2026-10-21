@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { NotFoundError } = require('../lib/errors');
+const { logAudit } = require('../lib/audit');
 
 router.get('/', (req, res) => {
   const now = new Date();
@@ -63,6 +64,15 @@ router.delete('/:id', (req, res, next) => {
     const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(req.params.id);
     if (!sale) throw new NotFoundError('Venda não encontrada.');
     db.prepare('DELETE FROM sales WHERE id = ?').run(req.params.id);
+
+    logAudit({
+      req,
+      action: 'sale.delete',
+      resourceType: 'sale',
+      resourceId: req.params.id,
+      details: { client_id: sale.client_id, type: sale.type, value: sale.value, sale_date: sale.sale_date },
+    });
+
     res.json({ ok: true, sale_id: sale.id });
   } catch (err) {
     next(err);

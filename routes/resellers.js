@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { formatDate, formatMonth } = require('../lib/dateHelpers');
+const { logAudit } = require('../lib/audit');
+const {
+  exportResellerData, anonymizeReseller, hardDeleteReseller, currentConsentVersion, nowTs,
+} = require('../lib/lgpd');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function notFound(res, msg = 'Não encontrado.') {
@@ -48,11 +52,28 @@ router.post('/', (req, res) => {
   const { name, phone, email, notes, status } = req.body;
   if (!name || !name.trim()) return badReq(res, 'O nome do revendedor é obrigatório.');
 
+  // LGPD-11: consentimento opcional do titular (revendedor).
+  const consentGiven = req.body.consent === true || req.body.consent === 'true'
+    || req.body.consent === 1 || req.body.consent === '1';
+  const consentGivenAt = consentGiven ? nowTs() : null;
+  const consentVersion = consentGiven
+    ? (req.body.consent_version ? String(req.body.consent_version) : currentConsentVersion())
+    : null;
+
   const info = db.prepare(
-    'INSERT INTO resellers (name, phone, email, notes, status) VALUES (?, ?, ?, ?, ?)',
-  ).run(name.trim(), phone || null, email || null, notes || null, status || 'ativo');
+    'INSERT INTO resellers (name, phone, email, notes, status, consent_given_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(name.trim(), phone || null, email || null, notes || null, status || 'ativo', consentGivenAt, consentVersion);
 
   const created = db.prepare('SELECT * FROM resellers WHERE id = ?').get(info.lastInsertRowid);
+
+  logAudit({
+    req,
+    action: 'reseller.create',
+    resourceType: 'reseller',
+    resourceId: created.id,
+    details: { name: created.name, phone: created.phone, email: created.email, status: created.status },
+  });
+
   res.status(201).json(created);
 });
 
@@ -73,7 +94,22 @@ router.put('/:id', (req, res) => {
     req.params.id,
   );
 
-  res.json(db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id));
+  const updated = db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id);
+
+  const changes = {};
+  for (const key of ['name', 'phone', 'email', 'status']) {
+    if (updated[key] !== existing[key]) changes[key] = { from: existing[key], to: updated[key] };
+  }
+
+  logAudit({
+    req,
+    action: 'reseller.update',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { changes },
+  });
+
+  res.json(updated);
 });
 
 // DELETE /api/resellers/:id — excluir
@@ -81,7 +117,65 @@ router.delete('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM resellers WHERE id = ?').get(req.params.id);
   if (!existing) return notFound(res, 'Revendedor não encontrado.');
   db.prepare('DELETE FROM resellers WHERE id = ?').run(req.params.id);
+
+  logAudit({
+    req,
+    action: 'reseller.delete',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { name: existing.name, email: existing.email, status: existing.status },
+  });
+
   res.status(204).send();
+});
+
+// ── LGPD-11: DIREITO DO TITULAR (DSAR) — REVENDEDORES ────────────────────────
+
+// GET /api/resellers/:id/export — exporta dados pessoais do revendedor
+router.get('/:id/export', (req, res) => {
+  const data = exportResellerData(req.params.id);
+  if (!data) return notFound(res, 'Revendedor não encontrado.');
+
+  logAudit({
+    req,
+    action: 'reseller.data_export',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { purchases: data.reseller_credit_purchases.length },
+  });
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="revendedor-${req.params.id}-lgpd.json"`);
+  res.send(JSON.stringify(data, null, 2));
+});
+
+// DELETE /api/resellers/:id/data — anonimiza (padrão) ou exclui (?hard=1)
+router.delete('/:id/data', (req, res) => {
+  const hard = req.query.hard === '1' || req.query.hard === 'true';
+  const existing = db.prepare('SELECT id, name FROM resellers WHERE id = ?').get(req.params.id);
+  if (!existing) return notFound(res, 'Revendedor não encontrado.');
+
+  if (hard) {
+    hardDeleteReseller(req.params.id);
+    logAudit({
+      req,
+      action: 'reseller.hard_delete',
+      resourceType: 'reseller',
+      resourceId: req.params.id,
+      details: { mode: 'hard' },
+    });
+    return res.json({ ok: true, mode: 'hard_delete', id: Number(req.params.id) });
+  }
+
+  anonymizeReseller(req.params.id);
+  logAudit({
+    req,
+    action: 'reseller.anonymize',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { mode: 'anonymize' },
+  });
+  return res.json({ ok: true, mode: 'anonymize', id: Number(req.params.id) });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -174,6 +268,21 @@ router.post('/purchases', (req, res) => {
     WHERE p.id = ?
   `).get(info.lastInsertRowid);
 
+  logAudit({
+    req,
+    action: 'reseller.purchase',
+    resourceType: 'reseller_purchase',
+    resourceId: created.id,
+    details: {
+      reseller_id: created.reseller_id,
+      server_id: created.server_id,
+      credits_qty: created.credits_qty,
+      amount_paid: created.amount_paid,
+      cost_per_credit: created.cost_per_credit,
+      purchase_date: created.purchase_date,
+    },
+  });
+
   res.status(201).json(created);
 });
 
@@ -207,6 +316,20 @@ router.put('/purchases/:id', (req, res) => {
     WHERE p.id = ?
   `).get(req.params.id);
 
+  logAudit({
+    req,
+    action: 'reseller.purchase_update',
+    resourceType: 'reseller_purchase',
+    resourceId: req.params.id,
+    details: {
+      reseller_id: updated.reseller_id,
+      credits_qty: updated.credits_qty,
+      amount_paid: updated.amount_paid,
+      cost_per_credit: updated.cost_per_credit,
+      purchase_date: updated.purchase_date,
+    },
+  });
+
   res.json(updated);
 });
 
@@ -215,6 +338,20 @@ router.delete('/purchases/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM reseller_credit_purchases WHERE id = ?').get(req.params.id);
   if (!existing) return notFound(res, 'Compra não encontrada.');
   db.prepare('DELETE FROM reseller_credit_purchases WHERE id = ?').run(req.params.id);
+
+  logAudit({
+    req,
+    action: 'reseller.purchase_delete',
+    resourceType: 'reseller_purchase',
+    resourceId: req.params.id,
+    details: {
+      reseller_id: existing.reseller_id,
+      credits_qty: existing.credits_qty,
+      amount_paid: existing.amount_paid,
+      purchase_date: existing.purchase_date,
+    },
+  });
+
   res.status(204).send();
 });
 

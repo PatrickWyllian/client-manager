@@ -158,6 +158,56 @@ function runMigrations() {
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
     )
   `);
+
+  // AUDIT-01 (LGPD-06): trilha de auditoria de acoes administrativas.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      username TEXT,
+      action TEXT NOT NULL,
+      resource_type TEXT,
+      resource_id TEXT,
+      ip TEXT,
+      user_agent TEXT,
+      status TEXT NOT NULL DEFAULT 'success',
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_username ON audit_log(username)");
+
+  // RETENÇÃO (LGPD-06): default configurável do prazo de retenção da trilha.
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('audit_log_retention_days', '90')").run();
+
+  // ── LGPD-11: consentimento e política de retenção de dados pessoais ────────
+  const clientColumns2 = db.prepare('PRAGMA table_info(clients)').all();
+  if (!clientColumns2.some(c => c.name === 'consent_given_at')) {
+    db.exec('ALTER TABLE clients ADD COLUMN consent_given_at TEXT');
+    console.log('[db] Migração: adicionada coluna consent_given_at em clients');
+  }
+  if (!clientColumns2.some(c => c.name === 'consent_version')) {
+    db.exec('ALTER TABLE clients ADD COLUMN consent_version TEXT');
+    console.log('[db] Migração: adicionada coluna consent_version em clients');
+  }
+
+  const resellerColumns = db.prepare('PRAGMA table_info(resellers)').all();
+  if (!resellerColumns.some(c => c.name === 'consent_given_at')) {
+    db.exec('ALTER TABLE resellers ADD COLUMN consent_given_at TEXT');
+    console.log('[db] Migração: adicionada coluna consent_given_at em resellers');
+  }
+  if (!resellerColumns.some(c => c.name === 'consent_version')) {
+    db.exec('ALTER TABLE resellers ADD COLUMN consent_version TEXT');
+    console.log('[db] Migração: adicionada coluna consent_version em resellers');
+  }
+
+  // LGPD-11: defaults configuráveis da política de retenção de dados pessoais.
+  // <= 0 desativa o respectivo job (mesmo padrão de audit_log_retention_days).
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('client_data_retention_days', '365')").run();
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('message_content_retention_days', '180')").run();
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('consent_version', '1')").run();
 }
 
 module.exports = runMigrations;

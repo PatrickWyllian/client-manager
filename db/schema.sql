@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS clients (
   username TEXT,
   password TEXT,
   notes TEXT,
+  consent_given_at TEXT, -- LGPD-11: quando o titular consentiu
+  consent_version TEXT,  -- LGPD-11: versão do termo aceita
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
 );
@@ -61,6 +63,10 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('post_expiry_schedule_enable
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_hour', '11');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_minute', '40');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_enabled', '1');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('audit_log_retention_days', '90');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('client_data_retention_days', '365');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('message_content_retention_days', '180');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('consent_version', '1');
 
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,3 +92,22 @@ CREATE TABLE IF NOT EXISTS message_queue (
   error TEXT,
   FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
 );
+
+-- AUDIT-01 (LGPD-06): trilha de auditoria de acoes administrativas.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  username TEXT,
+  action TEXT NOT NULL,
+  resource_type TEXT,
+  resource_id TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  status TEXT NOT NULL DEFAULT 'success',
+  details TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_username ON audit_log(username);

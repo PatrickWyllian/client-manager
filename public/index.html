@@ -502,6 +502,20 @@
             <button class="btn-secondary" id="btn-wa-disconnect" style="display:none">Desconectar</button>
           </div>
 
+          <!-- Pareamento por código (mais confiável que o QR) -->
+          <div class="wa-pairing" id="wa-pairing-section">
+            <h3 style="font-size:.95rem;margin:.9rem 0 .4rem">Conectar com código</h3>
+            <p style="font-size:.8rem;opacity:.75;margin:0 0 .5rem">Sem QR: gere um código e digite no WhatsApp → Aparelhos conectados → "Conectar com número de telefone".</p>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+              <input type="tel" id="wa-pairing-phone" value="553189440575" placeholder="Número da conta (ex: 553189440575)" style="flex:1;min-width:150px;padding:.45rem .6rem;border-radius:8px;border:1px solid rgba(148,163,184,.35);background:rgba(148,163,184,.08);color:inherit">
+              <button class="btn-secondary" id="btn-wa-pairing">Gerar código</button>
+            </div>
+            <div id="wa-pairing-code-box" style="display:none;margin-top:.6rem;padding:.8rem;border-radius:10px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3)">
+              <div style="font-size:.75rem;opacity:.8">Digite este código no celular (vale ~5 minutos):</div>
+              <div id="wa-pairing-code" style="font-size:1.6rem;font-weight:700;letter-spacing:.35em;margin-top:.2rem">--------</div>
+            </div>
+          </div>
+
           <!-- Aviso de vencimento -->
           <div class="wa-settings">
             <div class="wa-settings-header">

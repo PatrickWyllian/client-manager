@@ -11,7 +11,7 @@ module.exports = (waService, messageQueue) => {
 
   router.post('/connect', async (req, res) => {
     try {
-      await waService.connect();
+      await waService.connect(true);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -22,6 +22,18 @@ module.exports = (waService, messageQueue) => {
     try {
       await waService.disconnect();
       res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Pareamento por código de 8 dígitos (alternativa ao QR)
+  router.post('/pairing-code', async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) return res.status(400).json({ error: 'phone é obrigatório (número da conta WhatsApp).' });
+      const pairingCode = await waService.requestPairingCode(phone);
+      res.json({ ok: true, pairingCode });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

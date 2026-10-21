@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 const { NotFoundError, ValidationError } = require('../lib/errors');
 const { validatePlan } = require('../lib/validators');
+const { logAudit } = require('../lib/audit');
 
 // Listar todos os planos (com contagem de clientes)
 router.get('/', (req, res) => {
@@ -38,6 +39,15 @@ router.post('/', (req, res, next) => {
     );
     const info = stmt.run(name.trim(), price || 0, duration_months || 1, screens || 1);
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(info.lastInsertRowid);
+
+    logAudit({
+      req,
+      action: 'plan.create',
+      resourceType: 'plan',
+      resourceId: plan.id,
+      details: { name: plan.name, price: plan.price, duration_months: plan.duration_months, screens: plan.screens },
+    });
+
     res.status(201).json(plan);
   } catch (err) {
     next(err);
@@ -61,6 +71,20 @@ router.put('/:id', (req, res, next) => {
       req.params.id,
     );
     const updated = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id);
+
+    const changes = {};
+    for (const key of ['name', 'price', 'duration_months', 'screens']) {
+      if (updated[key] !== existing[key]) changes[key] = { from: existing[key], to: updated[key] };
+    }
+
+    logAudit({
+      req,
+      action: 'plan.update',
+      resourceType: 'plan',
+      resourceId: req.params.id,
+      details: { changes },
+    });
+
     res.json(updated);
   } catch (err) {
     next(err);
@@ -80,6 +104,15 @@ router.delete('/:id', (req, res, next) => {
       throw new ValidationError(`Não é possível excluir: ${clientCount} cliente(s) vinculado(s) a este plano.`);
     }
     db.prepare('DELETE FROM plans WHERE id = ?').run(req.params.id);
+
+    logAudit({
+      req,
+      action: 'plan.delete',
+      resourceType: 'plan',
+      resourceId: req.params.id,
+      details: { name: existing.name },
+    });
+
     res.status(204).send();
   } catch (err) {
     next(err);

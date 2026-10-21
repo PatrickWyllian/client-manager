@@ -860,8 +860,8 @@ document.getElementById('financeiro-month').value = brMonthKey(new Date());
 // ---------- WHATSAPP ----------
 function renderWaStatus(data){
   const { status, qr, phoneNumber } = data;
-  const dotMap = { connected: 'connected', connecting: 'connecting', qr: 'connecting', disconnected: 'disconnected' };
-  const textMap = { connected: 'Conectado', connecting: 'Conectando…', qr: 'Aguardando leitura do QR code', disconnected: 'Desconectado' };
+  const dotMap = { connected: 'connected', connecting: 'connecting', qr: 'connecting', disconnected: 'disconnected', failed: 'disconnected' };
+  const textMap = { connected: 'Conectado', connecting: 'Conectando…', qr: 'Aguardando leitura do QR code', disconnected: 'Desconectado', failed: 'Falhou — clique em "Conectar" para tentar de novo' };
   document.querySelectorAll('#wa-big-dot, #sidebar-wa-status .signal-dot').forEach(el => {
     el.className = 'signal-dot ' + (dotMap[status] || 'disconnected');
   });
@@ -892,6 +892,24 @@ document.getElementById('btn-wa-connect').addEventListener('click', async () => 
 });
 document.getElementById('btn-wa-disconnect').addEventListener('click', async () => {
   try { await api('/whatsapp/disconnect', { method: 'POST' }); toast('WhatsApp desconectado.'); } catch (err){ toast(err.message, true); }
+});
+
+// ---------- PAREAMENTO POR CÓDIGO ----------
+document.getElementById('btn-wa-pairing').addEventListener('click', async () => {
+  const phone = document.getElementById('wa-pairing-phone').value.trim();
+  const box = document.getElementById('wa-pairing-code-box');
+  const codeEl = document.getElementById('wa-pairing-code');
+  if (!phone) { toast('Informe o número da conta WhatsApp.', true); return; }
+  codeEl.textContent = '...';
+  box.style.display = 'block';
+  try {
+    const r = await api('/whatsapp/pairing-code', { method: 'POST', body: JSON.stringify({ phone }) });
+    codeEl.textContent = (r.pairingCode || '').replace(/(.{4})/, '$1-');
+    toast('Código gerado! Digite no WhatsApp → Aparelhos conectados → Conectar com número de telefone.');
+  } catch (err) {
+    box.style.display = 'none';
+    toast(err.message, true);
+  }
 });
 
 // ---------- RECUPERAÇÃO ----------

@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const db = require('../db/database');
 const { daysUntil, daysSince, formatDate } = require('../lib/dateHelpers');
+const { applyClientRetention, applyMessageRetention } = require('../lib/lgpd');
+const { logAudit } = require('../lib/audit');
 let messageQueue = null;
 let scheduledJobs = {};
 
@@ -47,6 +49,21 @@ function startScheduledJobs(waService, io) {
   });
   console.log('[scheduler] Expiração automática agendada para 00:05.');
 
+  // Retenção da trilha de auditoria (LGPD-06): poda diária às 03:30.
+  const auditRetentionExpr = '30 3 * * *';
+  scheduledJobs.auditRetention = cron.schedule(auditRetentionExpr, () => {
+    pruneAuditLog();
+  });
+  console.log('[scheduler] Retenção de audit_log agendada para 03:30.');
+
+  // Retenção de dados pessoais (LGPD-11): anonimiza PII de clientes inativos e
+  // conteúdo de mensagens antigas. Diário às 04:00.
+  const dataRetentionExpr = '0 4 * * *';
+  scheduledJobs.dataRetention = cron.schedule(dataRetentionExpr, () => {
+    applyDataRetention();
+  });
+  console.log('[scheduler] Retenção de dados pessoais (LGPD) agendada para 04:00.');
+
   if (schedules.reminder.enabled) {
     const cronExpr = `${schedules.reminder.minute} ${schedules.reminder.hour} * * *`;
     scheduledJobs.reminder = cron.schedule(cronExpr, () => {
@@ -81,6 +98,56 @@ function startScheduledJobs(waService, io) {
 
 function restartScheduler(waService, io) {
   startScheduledJobs(waService, io);
+}
+
+// RETENÇÃO (LGPD-06): poda a trilha de auditoria. Mantém os últimos N dias
+// (setting `audit_log_retention_days`, default 90; <=0 desativa). Idempotente,
+// roda 1x/dia e nunca derruba o app (try/catch).
+function pruneAuditLog() {
+  const days = parseInt(getSetting('audit_log_retention_days', '90'), 10);
+  if (!Number.isFinite(days) || days <= 0) {
+    console.log('[scheduler] Retenção de audit_log desativada (audit_log_retention_days <= 0).');
+    return 0;
+  }
+  try {
+    const result = db.prepare(
+      "DELETE FROM audit_log WHERE created_at < datetime('now', 'localtime', ?)",
+    ).run(`-${days} days`);
+    if (result.changes > 0) {
+      console.log(`[scheduler] Retenção audit_log: ${result.changes} registro(s) com mais de ${days} dias removido(s).`);
+    }
+    return result.changes;
+  } catch (err) {
+    console.error('[scheduler] Falha ao podar audit_log:', err.message);
+    return 0;
+  }
+}
+
+// RETENÇÃO (LGPD-11): aplica a política de retenção de dados pessoais.
+// Anonimiza PII de clientes inativos com mais de `client_data_retention_days`
+// dias e conteúdo de mensagens com mais de `message_content_retention_days`.
+// Mantém linhas/vendas. Nunca derruba o app (try/catch). <=0 desativa cada parte.
+function applyDataRetention() {
+  const clientDays = parseInt(getSetting('client_data_retention_days', '365'), 10);
+  const messageDays = parseInt(getSetting('message_content_retention_days', '180'), 10);
+  try {
+    const clients = applyClientRetention(clientDays);
+    const messages = applyMessageRetention(messageDays);
+    const summary = {
+      client_data_retention_days: clientDays,
+      message_content_retention_days: messageDays,
+      clients_anonymized: clients.clients || 0,
+      messages_anonymized: messages.messages || 0,
+    };
+    if (summary.clients_anonymized > 0 || summary.messages_anonymized > 0) {
+      console.log('[scheduler] Retenção de dados pessoais (LGPD):', summary);
+      logAudit({ action: 'lgpd.retention_apply', resourceType: 'lgpd', details: summary });
+    }
+    return summary;
+  } catch (err) {
+    console.error('[scheduler] Falha ao aplicar retenção de dados pessoais:', err.message);
+    return { error: err.message };
+  }
 }
 
 function expireOverdueClients() {
@@ -377,6 +444,8 @@ module.exports = {
   runReminderCheck,
   runRecoveryCheck,
   runPostExpiryCheck,
+  pruneAuditLog,
+  applyDataRetention,
   sendWelcomeMessage,
   recordNotification,
   buildWelcomeMessage,
