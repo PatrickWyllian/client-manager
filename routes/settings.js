@@ -31,6 +31,9 @@ module.exports = (waService, io) => {
       recovery_schedule_hour,
       recovery_schedule_minute,
       recovery_schedule_enabled,
+      client_data_retention_days,
+      message_content_retention_days,
+      consent_version,
     } = req.body;
     const upsert = db.prepare(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
@@ -49,6 +52,11 @@ module.exports = (waService, io) => {
     if (recovery_days_after_expiry !== undefined) setKey('recovery_days_after_expiry', String(recovery_days_after_expiry));
     if (recovery_batch_size !== undefined) setKey('recovery_batch_size', String(recovery_batch_size));
     if (post_expiry_days !== undefined) setKey('post_expiry_days', String(post_expiry_days));
+
+    // LGPD-11: política de retenção de dados pessoais e versão do consentimento.
+    if (client_data_retention_days !== undefined) setKey('client_data_retention_days', String(client_data_retention_days));
+    if (message_content_retention_days !== undefined) setKey('message_content_retention_days', String(message_content_retention_days));
+    if (consent_version !== undefined) setKey('consent_version', String(consent_version));
 
     let scheduleChanged = false;
     if (reminder_schedule_hour !== undefined) { setKey('reminder_schedule_hour', String(reminder_schedule_hour)); scheduleChanged = true; }

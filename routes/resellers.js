@@ -3,6 +3,9 @@ const router = express.Router();
 const db = require('../db/database');
 const { formatDate, formatMonth } = require('../lib/dateHelpers');
 const { logAudit } = require('../lib/audit');
+const {
+  exportResellerData, anonymizeReseller, hardDeleteReseller, currentConsentVersion, nowTs,
+} = require('../lib/lgpd');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function notFound(res, msg = 'Não encontrado.') {
@@ -49,9 +52,17 @@ router.post('/', (req, res) => {
   const { name, phone, email, notes, status } = req.body;
   if (!name || !name.trim()) return badReq(res, 'O nome do revendedor é obrigatório.');
 
+  // LGPD-11: consentimento opcional do titular (revendedor).
+  const consentGiven = req.body.consent === true || req.body.consent === 'true'
+    || req.body.consent === 1 || req.body.consent === '1';
+  const consentGivenAt = consentGiven ? nowTs() : null;
+  const consentVersion = consentGiven
+    ? (req.body.consent_version ? String(req.body.consent_version) : currentConsentVersion())
+    : null;
+
   const info = db.prepare(
-    'INSERT INTO resellers (name, phone, email, notes, status) VALUES (?, ?, ?, ?, ?)',
-  ).run(name.trim(), phone || null, email || null, notes || null, status || 'ativo');
+    'INSERT INTO resellers (name, phone, email, notes, status, consent_given_at, consent_version) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(name.trim(), phone || null, email || null, notes || null, status || 'ativo', consentGivenAt, consentVersion);
 
   const created = db.prepare('SELECT * FROM resellers WHERE id = ?').get(info.lastInsertRowid);
 
@@ -116,6 +127,55 @@ router.delete('/:id', (req, res) => {
   });
 
   res.status(204).send();
+});
+
+// ── LGPD-11: DIREITO DO TITULAR (DSAR) — REVENDEDORES ────────────────────────
+
+// GET /api/resellers/:id/export — exporta dados pessoais do revendedor
+router.get('/:id/export', (req, res) => {
+  const data = exportResellerData(req.params.id);
+  if (!data) return notFound(res, 'Revendedor não encontrado.');
+
+  logAudit({
+    req,
+    action: 'reseller.data_export',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { purchases: data.reseller_credit_purchases.length },
+  });
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="revendedor-${req.params.id}-lgpd.json"`);
+  res.send(JSON.stringify(data, null, 2));
+});
+
+// DELETE /api/resellers/:id/data — anonimiza (padrão) ou exclui (?hard=1)
+router.delete('/:id/data', (req, res) => {
+  const hard = req.query.hard === '1' || req.query.hard === 'true';
+  const existing = db.prepare('SELECT id, name FROM resellers WHERE id = ?').get(req.params.id);
+  if (!existing) return notFound(res, 'Revendedor não encontrado.');
+
+  if (hard) {
+    hardDeleteReseller(req.params.id);
+    logAudit({
+      req,
+      action: 'reseller.hard_delete',
+      resourceType: 'reseller',
+      resourceId: req.params.id,
+      details: { mode: 'hard' },
+    });
+    return res.json({ ok: true, mode: 'hard_delete', id: Number(req.params.id) });
+  }
+
+  anonymizeReseller(req.params.id);
+  logAudit({
+    req,
+    action: 'reseller.anonymize',
+    resourceType: 'reseller',
+    resourceId: req.params.id,
+    details: { mode: 'anonymize' },
+  });
+  return res.json({ ok: true, mode: 'anonymize', id: Number(req.params.id) });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

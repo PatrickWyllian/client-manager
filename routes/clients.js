@@ -7,6 +7,9 @@ const { encryptText, decryptText } = require('../lib/crypto');
 const { NotFoundError, ValidationError } = require('../lib/errors');
 const { validateClient } = require('../lib/validators');
 const { logAudit } = require('../lib/audit');
+const {
+  exportClientData, anonymizeClient, hardDeleteClient, currentConsentVersion, nowTs,
+} = require('../lib/lgpd');
 
 module.exports = (waService) => {
   // Listar clientes (com filtros opcionais: server_id, status, plan, filter_name)
@@ -75,6 +78,15 @@ module.exports = (waService) => {
 
       const { name, phone, plan, price, discount, server_id, due_date, status, username, password, notes } = req.body;
 
+      // LGPD-11: consentimento do titular (opcional no body). Quando informado,
+      // registra o timestamp e a versão vigente do termo.
+      const consentGiven = req.body.consent === true || req.body.consent === 'true'
+        || req.body.consent === 1 || req.body.consent === '1';
+      const consentGivenAt = consentGiven ? nowTs() : null;
+      const consentVersion = consentGiven
+        ? (req.body.consent_version ? String(req.body.consent_version) : currentConsentVersion())
+        : null;
+
       // Criptografia de senha do servidor
       const encPassword = password ? encryptText(password.trim()) : null;
 
@@ -85,8 +97,8 @@ module.exports = (waService) => {
         const createdExpiredAt = createStatus === 'expirado' ? nowTs : null;
         const createdCancelledAt = createStatus === 'cancelado' ? nowTs : null;
         const stmt = db.prepare(`
-          INSERT INTO clients (name, phone, plan, price, discount, server_id, due_date, status, expired_at, cancelled_at, username, password, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO clients (name, phone, plan, price, discount, server_id, due_date, status, expired_at, cancelled_at, username, password, notes, consent_given_at, consent_version)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const info = stmt.run(
           name.trim(),
@@ -102,6 +114,8 @@ module.exports = (waService) => {
           username || null,
           encPassword,
           notes || null,
+          consentGivenAt,
+          consentVersion,
         );
 
         const clientId = info.lastInsertRowid;
@@ -133,6 +147,7 @@ module.exports = (waService) => {
           server_id: client.server_id,
           due_date: client.due_date,
           status: client.status,
+          consent_version: client.consent_version || null,
         },
       });
 
@@ -305,6 +320,70 @@ module.exports = (waService) => {
         password: updated.password ? decryptText(updated.password) : null,
         days_until_due: daysUntil(updated.due_date),
       });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ── LGPD-11: DIREITO DO TITULAR (DSAR) ──────────────────────────────────────
+
+  // Exportação dos dados pessoais do titular (direito de acesso/portabilidade).
+  // GET /api/clients/:id/export -> JSON com client + sales + message_queue + notifications_log
+  router.get('/:id/export', (req, res, next) => {
+    try {
+      const data = exportClientData(req.params.id);
+      if (!data) throw new NotFoundError('Cliente não encontrado.');
+
+      logAudit({
+        req,
+        action: 'client.data_export',
+        resourceType: 'client',
+        resourceId: req.params.id,
+        details: {
+          sales: data.sales.length,
+          messages: data.message_queue.length,
+          notifications: data.notifications_log.length,
+        },
+      });
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="cliente-${req.params.id}-lgpd.json"`);
+      res.send(JSON.stringify(data, null, 2));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Anonimização (padrão) ou exclusão real (?hard=1) dos dados do titular.
+  // Mantém a linha e as vendas na anonimização (obrigação legal/financeira).
+  // DELETE /api/clients/:id/data  |  DELETE /api/clients/:id/data?hard=1
+  router.delete('/:id/data', (req, res, next) => {
+    try {
+      const hard = req.query.hard === '1' || req.query.hard === 'true';
+      const existing = db.prepare('SELECT id, name, phone FROM clients WHERE id = ?').get(req.params.id);
+      if (!existing) throw new NotFoundError('Cliente não encontrado.');
+
+      if (hard) {
+        const result = hardDeleteClient(req.params.id);
+        logAudit({
+          req,
+          action: 'client.hard_delete',
+          resourceType: 'client',
+          resourceId: req.params.id,
+          details: { mode: 'hard', messages_deleted: result.messages_deleted },
+        });
+        return res.json({ ok: true, mode: 'hard_delete', id: Number(req.params.id), messages_deleted: result.messages_deleted });
+      }
+
+      const result = anonymizeClient(req.params.id);
+      logAudit({
+        req,
+        action: 'client.anonymize',
+        resourceType: 'client',
+        resourceId: req.params.id,
+        details: { mode: 'anonymize', messages_anonymized: result.messages_anonymized },
+      });
+      return res.json({ ok: true, mode: 'anonymize', id: Number(req.params.id), messages_anonymized: result.messages_anonymized });
     } catch (err) {
       next(err);
     }

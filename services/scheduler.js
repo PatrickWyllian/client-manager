@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const db = require('../db/database');
 const { daysUntil, daysSince, formatDate } = require('../lib/dateHelpers');
+const { applyClientRetention, applyMessageRetention } = require('../lib/lgpd');
+const { logAudit } = require('../lib/audit');
 let messageQueue = null;
 let scheduledJobs = {};
 
@@ -53,6 +55,14 @@ function startScheduledJobs(waService, io) {
     pruneAuditLog();
   });
   console.log('[scheduler] Retenção de audit_log agendada para 03:30.');
+
+  // Retenção de dados pessoais (LGPD-11): anonimiza PII de clientes inativos e
+  // conteúdo de mensagens antigas. Diário às 04:00.
+  const dataRetentionExpr = '0 4 * * *';
+  scheduledJobs.dataRetention = cron.schedule(dataRetentionExpr, () => {
+    applyDataRetention();
+  });
+  console.log('[scheduler] Retenção de dados pessoais (LGPD) agendada para 04:00.');
 
   if (schedules.reminder.enabled) {
     const cronExpr = `${schedules.reminder.minute} ${schedules.reminder.hour} * * *`;
@@ -110,6 +120,33 @@ function pruneAuditLog() {
   } catch (err) {
     console.error('[scheduler] Falha ao podar audit_log:', err.message);
     return 0;
+  }
+}
+
+// RETENÇÃO (LGPD-11): aplica a política de retenção de dados pessoais.
+// Anonimiza PII de clientes inativos com mais de `client_data_retention_days`
+// dias e conteúdo de mensagens com mais de `message_content_retention_days`.
+// Mantém linhas/vendas. Nunca derruba o app (try/catch). <=0 desativa cada parte.
+function applyDataRetention() {
+  const clientDays = parseInt(getSetting('client_data_retention_days', '365'), 10);
+  const messageDays = parseInt(getSetting('message_content_retention_days', '180'), 10);
+  try {
+    const clients = applyClientRetention(clientDays);
+    const messages = applyMessageRetention(messageDays);
+    const summary = {
+      client_data_retention_days: clientDays,
+      message_content_retention_days: messageDays,
+      clients_anonymized: clients.clients || 0,
+      messages_anonymized: messages.messages || 0,
+    };
+    if (summary.clients_anonymized > 0 || summary.messages_anonymized > 0) {
+      console.log('[scheduler] Retenção de dados pessoais (LGPD):', summary);
+      logAudit({ action: 'lgpd.retention_apply', resourceType: 'lgpd', details: summary });
+    }
+    return summary;
+  } catch (err) {
+    console.error('[scheduler] Falha ao aplicar retenção de dados pessoais:', err.message);
+    return { error: err.message };
   }
 }
 
@@ -408,6 +445,7 @@ module.exports = {
   runRecoveryCheck,
   runPostExpiryCheck,
   pruneAuditLog,
+  applyDataRetention,
   sendWelcomeMessage,
   recordNotification,
   buildWelcomeMessage,

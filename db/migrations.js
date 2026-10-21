@@ -181,6 +181,33 @@ function runMigrations() {
 
   // RETENÇÃO (LGPD-06): default configurável do prazo de retenção da trilha.
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('audit_log_retention_days', '90')").run();
+
+  // ── LGPD-11: consentimento e política de retenção de dados pessoais ────────
+  const clientColumns2 = db.prepare('PRAGMA table_info(clients)').all();
+  if (!clientColumns2.some(c => c.name === 'consent_given_at')) {
+    db.exec('ALTER TABLE clients ADD COLUMN consent_given_at TEXT');
+    console.log('[db] Migração: adicionada coluna consent_given_at em clients');
+  }
+  if (!clientColumns2.some(c => c.name === 'consent_version')) {
+    db.exec('ALTER TABLE clients ADD COLUMN consent_version TEXT');
+    console.log('[db] Migração: adicionada coluna consent_version em clients');
+  }
+
+  const resellerColumns = db.prepare('PRAGMA table_info(resellers)').all();
+  if (!resellerColumns.some(c => c.name === 'consent_given_at')) {
+    db.exec('ALTER TABLE resellers ADD COLUMN consent_given_at TEXT');
+    console.log('[db] Migração: adicionada coluna consent_given_at em resellers');
+  }
+  if (!resellerColumns.some(c => c.name === 'consent_version')) {
+    db.exec('ALTER TABLE resellers ADD COLUMN consent_version TEXT');
+    console.log('[db] Migração: adicionada coluna consent_version em resellers');
+  }
+
+  // LGPD-11: defaults configuráveis da política de retenção de dados pessoais.
+  // <= 0 desativa o respectivo job (mesmo padrão de audit_log_retention_days).
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('client_data_retention_days', '365')").run();
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('message_content_retention_days', '180')").run();
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('consent_version', '1')").run();
 }
 
 module.exports = runMigrations;

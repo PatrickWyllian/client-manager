@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS clients (
   username TEXT,
   password TEXT,
   notes TEXT,
+  consent_given_at TEXT, -- LGPD-11: quando o titular consentiu
+  consent_version TEXT,  -- LGPD-11: versão do termo aceita
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
 );
@@ -62,6 +64,9 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_hour', '1
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_minute', '40');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('recovery_schedule_enabled', '1');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('audit_log_retention_days', '90');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('client_data_retention_days', '365');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('message_content_retention_days', '180');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('consent_version', '1');
 
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
