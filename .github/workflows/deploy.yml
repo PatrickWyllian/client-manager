@@ -4,6 +4,9 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -25,6 +28,17 @@ jobs:
           push: true
           tags: r33xcrypt/client-manager:latest
 
+      # A VPS nao aceita SSH vindo da internet (porta 22 fechada; SSH so pela tailnet).
+      # O runner entra na tailnet como no EFEMERO (tag:ci) e fala com a VPS pelo IP 100.x.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: latest
+          ping: 100.106.0.92
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -33,7 +47,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: IMAGE_DIGEST
           script: |
-            docker pull "r33xcrypt/client-manager@$IMAGE_DIGEST"
-            docker service update --image "r33xcrypt/client-manager@$IMAGE_DIGEST" client_manager_app
+            sudo docker pull "r33xcrypt/client-manager@$IMAGE_DIGEST"
+            sudo docker service update --image "r33xcrypt/client-manager@$IMAGE_DIGEST" client_manager_app
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
